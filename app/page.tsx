@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, CheckCircle, XCircle, Calendar, Target, Plus, ArrowRight } from "lucide-react";
+import { BookOpen, CheckCircle, XCircle, Calendar, Target, Plus, ArrowRight, TrendingUp, AlertCircle, Shield, Flame } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BottomNav from "./components/BottomNav";
 import VerseSection from "./components/VerseSection";
 import HabitsSection from "./components/HabitsSection";
 import ProjectsSection from "./components/ProjectsSection";
 import ProfileSection from "./components/ProfileSection";
+import { Storage } from "./utils/storage";
 
 interface BibleVerse {
   text: string;
@@ -19,13 +20,22 @@ interface SummaryStats {
   positiveCompleted: number;
   badTotal: number;
   badClean: number;
+  projectsTotal: number;
+  projectsBehind: number;
 }
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
   const [direction, setDirection] = useState(0);
   const [verse, setVerse] = useState<BibleVerse | null>(null);
-  const [stats, setStats] = useState<SummaryStats>({ positiveTotal: 0, positiveCompleted: 0, badTotal: 0, badClean: 0 });
+  const [stats, setStats] = useState<SummaryStats>({
+    positiveTotal: 0,
+    positiveCompleted: 0,
+    badTotal: 0,
+    badClean: 0,
+    projectsTotal: 0,
+    projectsBehind: 0
+  });
   const [loading, setLoading] = useState(true);
 
   const tabs = ['home', 'verse', 'habits', 'projects', 'profile'];
@@ -49,6 +59,9 @@ export default function Home() {
     if (tabParam && tabs.includes(tabParam)) {
       setActiveTab(tabParam);
     }
+
+    // RUN DAILY LOGIC CHECK ON LOAD
+    Storage.checkDailyReset();
 
     // Handle online reconnection
     const handleOnline = () => {
@@ -114,21 +127,41 @@ export default function Home() {
   }, [activeTab]);
 
   const loadStats = () => {
-    const positive = JSON.parse(localStorage.getItem('positiveHabits') || '[]');
-    const bad = JSON.parse(localStorage.getItem('badHabits') || '[]');
+    if (typeof window === 'undefined') return;
 
-    const posCompleted = positive.filter((h: any) => h.completed).length;
-    const badFailures = bad.filter((h: any) => h.completed).length;
+    const { positive, negative } = Storage.getHabits();
+    const projects = Storage.getProjects();
+
+    const posCompleted = positive.filter(h => h.completed).length;
+    // For negative habits, 'completed' means FAILED. So Clean = Total - Failed
+    const badFailures = negative.filter(h => h.completed).length;
+
+    // Calculate Project status
+    let behindCount = 0;
+    projects.forEach(p => {
+      // Simple pacing logic duplication for summary
+      const start = new Date(p.startDate).getTime();
+      const end = new Date(p.deadline).getTime();
+      const now = Date.now();
+      if (end > start) {
+        const timePercent = ((now - start) / (end - start)) * 100;
+        if (p.progress < timePercent - 10) behindCount++;
+      }
+    });
 
     setStats({
       positiveTotal: positive.length,
       positiveCompleted: posCompleted,
-      badTotal: bad.length,
-      badClean: bad.length - badFailures
+      badTotal: negative.length,
+      badClean: negative.length - badFailures,
+      projectsTotal: projects.length,
+      projectsBehind: behindCount
     });
   };
 
   const fetchVerse = async (forceRefetch = false) => {
+    if (typeof window === 'undefined') return;
+
     const today = new Date().toDateString();
     const cachedDate = localStorage.getItem('verseDate');
     const cachedVerse = localStorage.getItem('cachedVerse');
@@ -169,7 +202,7 @@ export default function Home() {
     }
   };
 
-  const today = new Date().toLocaleDateString('en-US', {
+  const todayStr = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric'
@@ -196,7 +229,7 @@ export default function Home() {
     <div className="min-h-screen bg-transparent text-white pb-24 px-4 pt-6">
       <header className="flex justify-between items-start mb-8">
         <div>
-          <p className="text-gray-400 text-sm font-medium mb-1">{today}</p>
+          <p className="text-gray-400 text-sm font-medium mb-1">{todayStr}</p>
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500">
             {getGreeting()}
           </h1>
@@ -213,45 +246,55 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-br from-[#7dd3fc]/10 to-transparent opacity-50" />
 
           <div className="relative z-10">
-            <h2 className="text-lg font-semibold mb-4 text-[#7dd3fc]">Daily Progress</h2>
+            <h2 className="text-lg font-semibold mb-4 text-[#7dd3fc]">Daily Overview</h2>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Habits Card */}
               <div
                 onClick={() => handleTabChange('habits')}
-                className="bg-[#0f0f0f]/80 p-4 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors"
+                className="bg-[#0f0f0f]/80 p-4 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors border border-transparent hover:border-[#86efac]/30"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <CheckCircle className="text-[#86efac]" size={20} />
-                  <span className="text-2xl font-bold">{stats.positiveCompleted}/{stats.positiveTotal}</span>
-                </div>
-                <p className="text-xs text-gray-400">Habits Done</p>
-                {stats.positiveTotal > 0 && (
-                  <div className="w-full bg-[#1a1a1a] h-1.5 rounded-full mt-3 overflow-hidden">
-                    <div
-                      className="h-full bg-[#86efac] rounded-full"
-                      style={{ width: `${(stats.positiveCompleted / stats.positiveTotal) * 100}%` }}
-                    />
+                  <div className="flex items-center space-x-2">
+                    <Target className="text-[#86efac]" size={18} />
+                    <span className="text-xs text-gray-400">Habits</span>
                   </div>
-                )}
+                  <span className="text-xl font-bold text-white">{stats.positiveCompleted}/{stats.positiveTotal}</span>
+                </div>
+
+                {/* Visualizing clean streak or failure */}
+                <div className="flex items-center justify-between mt-3 text-xs">
+                  <span className="text-gray-500">Avoided:</span>
+                  <span className={`${stats.badClean === stats.badTotal ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>
+                    {stats.badClean}/{stats.badTotal}
+                  </span>
+                </div>
               </div>
 
+              {/* Projects Card */}
               <div
-                onClick={() => handleTabChange('habits')}
-                className="bg-[#0f0f0f]/80 p-4 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors"
+                onClick={() => handleTabChange('projects')}
+                className="bg-[#0f0f0f]/80 p-4 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors border border-transparent hover:border-[#7dd3fc]/30"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <XCircle className="text-[#fca5a5]" size={20} />
-                  <span className="text-2xl font-bold">{stats.badClean}/{stats.badTotal}</span>
-                </div>
-                <p className="text-xs text-gray-400">Avoided</p>
-                {stats.badTotal > 0 && (
-                  <div className="w-full bg-[#1a1a1a] h-1.5 rounded-full mt-3 overflow-hidden">
-                    <div
-                      className="h-full bg-[#fca5a5] rounded-full"
-                      style={{ width: `${(stats.badClean / stats.badTotal) * 100}%` }}
-                    />
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="text-[#7dd3fc]" size={18} />
+                    <span className="text-xs text-gray-400">Projects</span>
                   </div>
-                )}
+                  <span className="text-xl font-bold text-white">{stats.projectsTotal}</span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Overall Pacing:</span>
+                  <span className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${stats.projectsBehind > 0
+                      ? 'bg-[#fca5a5]/10 border-[#fca5a5]/20 text-[#fca5a5]'
+                      : 'bg-[#86efac]/10 border-[#86efac]/20 text-[#86efac]'
+                    }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${stats.projectsBehind > 0 ? 'bg-[#fca5a5]' : 'bg-[#86efac]'
+                      }`} />
+                    {stats.projectsBehind > 0 ? `${stats.projectsBehind} Behind` : 'On Track'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
