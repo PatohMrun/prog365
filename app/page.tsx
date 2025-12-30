@@ -1,15 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-// Icon placeholders - replace with actual lucide-react imports
-const BookOpenIcon = () => <div className="w-5 h-5 border border-current rounded" />;
-const CheckCircleIcon = () => <div className="w-5 h-5 border border-current rounded-full" />;
-const XCircleIcon = () => <div className="w-5 h-5 border border-current rounded-full" />;
-const PlusIcon = () => <div className="w-4 h-4 border border-current" />;
-const CalendarIcon = () => <div className="w-5 h-5 border border-current rounded" />;
-const TargetIcon = () => <div className="w-5 h-5 border border-current rounded-full" />;
-const TrashIcon = () => <div className="w-4 h-4 border border-current" />;
+import { BookOpen, CheckCircle, XCircle, Plus, Calendar, Target, Trash2, BarChart3, User } from "lucide-react";
+import BottomNav from "./components/BottomNav";
+import VerseSection from "./components/VerseSection";
+import HabitsSection from "./components/HabitsSection";
 
 interface BibleVerse {
   text: string;
@@ -31,6 +26,7 @@ interface Project {
 }
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState('home');
   const [verse, setVerse] = useState<BibleVerse | null>(null);
   const [loading, setLoading] = useState(true);
   const [positiveHabits, setPositiveHabits] = useState<Habit[]>([]);
@@ -170,10 +166,25 @@ export default function Home() {
     day: 'numeric' 
   });
 
-  return (
-    <div className="min-h-screen bg-black text-white">
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'verse':
+        return <VerseSection />;
+      case 'habits':
+        return <HabitsSection />;
+      case 'projects':
+        return <ProjectsSection />;
+      case 'profile':
+        return <ProfileSection />;
+      default:
+        return <HomeSection />;
+    }
+  };
+
+  const HomeSection = () => (
+    <div className="min-h-screen bg-black text-white pb-20">
       {/* Header */}
-      <header className="border-b border-[#1a1a1a] bg-black/50 backdrop-blur-xl sticky top-0 z-50">
+      <header className="border-b border-[#1a1a1a] bg-black/50 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -181,7 +192,7 @@ export default function Home() {
               <p className="text-gray-400 text-sm">Daily Growth Tracker</p>
             </div>
             <div className="flex items-center space-x-2 text-sm text-[#7dd3fc]">
-              <CalendarIcon />
+              <Calendar size={16} />
               <span className="hidden sm:inline">{today}</span>
               <span className="sm:hidden">{new Date().toLocaleDateString()}</span>
             </div>
@@ -194,7 +205,7 @@ export default function Home() {
         <section className="mb-8 sm:mb-12">
           <div className="glass-card rounded-2xl p-6 sm:p-8 hover-lift animate-fade-in">
             <div className="flex items-center space-x-3 mb-6">
-              <BookOpenIcon />
+              <BookOpen size={20} className="text-[#7dd3fc]" />
               <h2 className="text-xl font-semibold text-[#7dd3fc]">Today's Verse</h2>
             </div>
             {loading ? (
@@ -222,14 +233,14 @@ export default function Home() {
           <div className="glass-card rounded-2xl p-6 sm:p-8 hover-lift">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <CheckCircleIcon />
+                <CheckCircle size={20} className="text-[#86efac]" />
                 <h2 className="text-lg sm:text-xl font-semibold text-[#86efac]">Build Habits</h2>
               </div>
               <button 
                 onClick={() => setShowAddHabit('positive')}
                 className="text-[#7dd3fc] hover:text-white transition-colors p-1"
               >
-                <PlusIcon />
+                <Plus size={16} />
               </button>
             </div>
             
@@ -289,7 +300,7 @@ export default function Home() {
                       onClick={() => deleteHabit(habit.id, 'positive')}
                       className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all p-1 flex-shrink-0"
                     >
-                      <TrashIcon />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -304,14 +315,14 @@ export default function Home() {
           <div className="glass-card rounded-2xl p-6 sm:p-8 hover-lift">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-3">
-                <XCircleIcon />
+                <XCircle size={20} className="text-[#fca5a5]" />
                 <h2 className="text-lg sm:text-xl font-semibold text-[#fca5a5]">Avoid Today</h2>
               </div>
               <button 
                 onClick={() => setShowAddHabit('bad')}
                 className="text-[#7dd3fc] hover:text-white transition-colors p-1"
               >
-                <PlusIcon />
+                <Plus size={16} />
               </button>
             </div>
             
@@ -371,7 +382,7 @@ export default function Home() {
                       onClick={() => deleteHabit(habit.id, 'bad')}
                       className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all p-1 flex-shrink-0"
                     >
-                      <TrashIcon />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -388,14 +399,14 @@ export default function Home() {
           <div className="glass-card rounded-2xl p-6 sm:p-8 hover-lift">
             <div className="flex items-center justify-between mb-6 sm:mb-8">
               <div className="flex items-center space-x-3">
-                <TargetIcon />
+                <Target size={20} className="text-[#7dd3fc]" />
                 <h2 className="text-lg sm:text-xl font-semibold text-[#7dd3fc]">Active Projects</h2>
               </div>
               <button 
                 onClick={() => setShowAddProject(true)}
                 className="text-[#7dd3fc] hover:text-white transition-colors p-1"
               >
-                <PlusIcon />
+                <Plus size={16} />
               </button>
             </div>
             
@@ -458,7 +469,7 @@ export default function Home() {
                           onClick={() => deleteProject(project.id)}
                           className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all p-1"
                         >
-                          <TrashIcon />
+                          <Trash2 size={16} />
                         </button>
                       </div>
                     </div>
@@ -485,6 +496,173 @@ export default function Home() {
           </div>
         </section>
       </main>
+    </div>
+  );
+
+  const ProjectsSection = () => (
+    <div className="min-h-screen bg-black text-white pb-20 px-4 pt-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center space-x-3 mb-8">
+          <BarChart3 className="text-[#7dd3fc]" size={28} />
+          <h1 className="text-3xl font-bold text-[#7dd3fc]">Projects</h1>
+        </div>
+        
+        <div className="glass-card rounded-2xl p-8 hover-lift">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-xl font-semibold text-[#7dd3fc]">Active Projects</h2>
+            <button 
+              onClick={() => setShowAddProject(true)}
+              className="text-[#7dd3fc] hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1a1a1a]"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
+          
+          {showAddProject && (
+            <div className="mb-6 p-4 rounded-xl gradient-bg">
+              <input
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Enter project name..."
+                className="w-full input-field rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                onKeyPress={(e) => e.key === 'Enter' && addProject()}
+                autoFocus
+              />
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={addProject}
+                  className="px-4 py-2 bg-[#7dd3fc] text-black rounded-lg text-sm font-medium hover:bg-[#7dd3fc]/80 transition-colors"
+                >
+                  Add Project
+                </button>
+                <button
+                  onClick={() => setShowAddProject(false)}
+                  className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-sm hover:bg-[#666] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="grid gap-6">
+            {projects.map(project => (
+              <div key={project.id} className="group">
+                <div className="p-6 rounded-xl bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-all">
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg break-words">{project.name}</h3>
+                      <p className="text-gray-400 text-sm">{project.lastUpdated}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => updateProgress(project.id, -5)}
+                          className="w-8 h-8 rounded-full bg-[#1a1a1a] hover:bg-[#666] transition-colors flex items-center justify-center text-sm font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="text-[#7dd3fc] font-mono text-lg min-w-[3rem] text-center">
+                          {project.progress}%
+                        </span>
+                        <button 
+                          onClick={() => updateProgress(project.id, 5)}
+                          className="w-8 h-8 rounded-full bg-[#1a1a1a] hover:bg-[#666] transition-colors flex items-center justify-center text-sm font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => deleteProject(project.id)}
+                        className="text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-all p-1"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <div className="w-full bg-[#1a1a1a] rounded-full h-3 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          project.progress > 70 ? 'progress-glow' : ''
+                        }`}
+                        style={{ 
+                          width: `${project.progress}%`,
+                          background: `linear-gradient(90deg, #7dd3fc, #86efac)`
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {projects.length === 0 && (
+              <p className="text-gray-400 text-center py-8 text-sm">No projects yet. Add your first project to track!</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const ProfileSection = () => (
+    <div className="min-h-screen bg-black text-white pb-20 px-4 pt-6">
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center space-x-3 mb-8">
+          <User className="text-[#7dd3fc]" size={28} />
+          <h1 className="text-3xl font-bold text-[#7dd3fc]">Profile</h1>
+        </div>
+        
+        <div className="space-y-6">
+          <div className="glass-card rounded-2xl p-8">
+            <h2 className="text-xl font-semibold mb-6 text-[#86efac]">Statistics</h2>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-[#7dd3fc]">{positiveHabits.length}</div>
+                <div className="text-gray-400 text-sm">Positive Habits</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-[#fca5a5]">{badHabits.length}</div>
+                <div className="text-gray-400 text-sm">Habits to Avoid</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-[#86efac]">{projects.length}</div>
+                <div className="text-gray-400 text-sm">Active Projects</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-[#7dd3fc]">0</div>
+                <div className="text-gray-400 text-sm">Days Streak</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="glass-card rounded-2xl p-8">
+            <h2 className="text-xl font-semibold mb-6 text-[#86efac]">Settings</h2>
+            <div className="space-y-4">
+              <button className="w-full text-left p-4 rounded-lg bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-colors">
+                <div className="font-medium">Notifications</div>
+                <div className="text-gray-400 text-sm">Manage your notification preferences</div>
+              </button>
+              <button className="w-full text-left p-4 rounded-lg bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-colors">
+                <div className="font-medium">Export Data</div>
+                <div className="text-gray-400 text-sm">Download your progress data</div>
+              </button>
+              <button className="w-full text-left p-4 rounded-lg bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-colors">
+                <div className="font-medium">Reset Progress</div>
+                <div className="text-gray-400 text-sm">Clear all data and start fresh</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {renderContent()}
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }
