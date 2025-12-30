@@ -3,12 +3,10 @@
 import { useState, useEffect } from "react";
 import { CheckCircle, XCircle, Plus, Trash2, Target, Pencil, X, Check, AlertTriangle } from "lucide-react";
 
-interface Habit {
-  id: string;
-  name: string;
-  completed: boolean;
-  streak: number;
-}
+import { Storage, Habit } from "../utils/storage";
+
+// Remove local Habit interface
+
 
 export default function HabitsSection() {
   const [positiveHabits, setPositiveHabits] = useState<Habit[]>([]);
@@ -41,11 +39,16 @@ export default function HabitsSection() {
   const addHabit = (type: 'positive' | 'bad') => {
     if (!newHabitName.trim()) return;
 
+    const today = new Date().toLocaleDateString('en-CA');
+
     const newHabit: Habit = {
       id: Date.now().toString(),
       name: newHabitName.trim(),
+      type: type,
       completed: false,
-      streak: 0
+      streak: 0,
+      history: [],
+      lastChecked: today
     };
 
     if (type === 'positive') {
@@ -83,16 +86,37 @@ export default function HabitsSection() {
   };
 
   const toggleHabit = (id: string, type: 'positive' | 'bad') => {
+    const today = new Date().toLocaleDateString('en-CA');
+
+    const updater = (h: Habit) => {
+      if (h.id !== id) return h;
+
+      const isCompletedNow = !h.completed;
+      let newHistory = [...(h.history || [])];
+
+      if (isCompletedNow) {
+        // Add today to history if not present
+        if (!newHistory.includes(today)) newHistory.push(today);
+      } else {
+        // Remove today from history
+        newHistory = newHistory.filter(date => date !== today);
+      }
+
+      return {
+        ...h,
+        completed: isCompletedNow,
+        streak: isCompletedNow ? h.streak + 1 : Math.max(0, h.streak - 1),
+        history: newHistory,
+        lastChecked: today
+      };
+    };
+
     if (type === 'positive') {
-      const updated = positiveHabits.map(h =>
-        h.id === id ? { ...h, completed: !h.completed } : h
-      );
+      const updated = positiveHabits.map(updater);
       setPositiveHabits(updated);
       saveToStorage(updated, badHabits);
     } else {
-      const updated = badHabits.map(h =>
-        h.id === id ? { ...h, completed: !h.completed } : h
-      );
+      const updated = badHabits.map(updater);
       setBadHabits(updated);
       saveToStorage(positiveHabits, updated);
     }
@@ -207,14 +231,14 @@ export default function HabitsSection() {
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {positiveHabits.map(habit => (
                 <div key={habit.id} className="group">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-all border border-transparent hover:border-gray-800">
-                    <div className="flex items-center space-x-4 flex-1">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-all border border-transparent hover:border-gray-800">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
                       <button
                         onClick={() => toggleHabit(habit.id, 'positive')}
-                        className={`w-6 h-6 rounded-full border-2 transition-all flex-shrink-0 ${habit.completed
+                        className={`w-5 h-5 rounded-full border-2 transition-all flex-shrink-0 ${habit.completed
                           ? 'bg-[#86efac] border-[#86efac] shadow-lg shadow-[#86efac]/30'
                           : 'border-[#666] hover:border-[#86efac]'
                           }`}
@@ -234,31 +258,31 @@ export default function HabitsSection() {
                           <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-white p-1"><X size={14} /></button>
                         </div>
                       ) : (
-                        <div className="flex-1 min-w-0">
-                          <span className={`font-medium break-words ${habit.completed ? 'line-through text-gray-500' : ''
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                          <span className={`font-medium text-sm truncate ${habit.completed ? 'line-through text-gray-500' : ''
                             }`}>
                             {habit.name}
                           </span>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {habit.streak} day streak
+                          <div className="text-[10px] text-gray-500 font-mono whitespace-nowrap bg-[#1a1a1a] px-1.5 py-0.5 rounded">
+                            {habit.streak}d
                           </div>
                         </div>
                       )}
                     </div>
 
                     {!editingId && (
-                      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center ml-2">
                         <button
                           onClick={() => startEdit(habit)}
-                          className="text-gray-400 hover:text-[#7dd3fc] p-2 hover:bg-[#7dd3fc]/10 rounded-lg transition-colors"
+                          className="text-gray-400 hover:text-[#7dd3fc] p-1.5 hover:bg-[#7dd3fc]/10 rounded-lg transition-colors"
                         >
-                          <Pencil size={15} />
+                          <Pencil size={12} />
                         </button>
                         <button
                           onClick={() => promptDelete(habit.id, 'positive')}
-                          className="text-gray-400 hover:text-red-400 p-2 hover:bg-red-500/10 rounded-lg transition-colors ml-1"
+                          className="text-gray-400 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors ml-1"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     )}
@@ -266,47 +290,47 @@ export default function HabitsSection() {
                 </div>
               ))}
               {positiveHabits.length === 0 && (
-                <p className="text-gray-400 text-center py-8 text-sm">No habits yet. Add your first positive habit!</p>
+                <p className="text-gray-400 text-center py-6 text-xs">No habits yet.</p>
               )}
             </div>
           </div>
 
           {/* Bad Habits */}
-          <div className="glass-card rounded-2xl p-8 hover-lift">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <XCircle className="text-[#fca5a5]" size={24} />
-                <h2 className="text-lg font-semibold text-[#fca5a5]">Avoid Today</h2>
+          <div className="glass-card rounded-2xl p-6 hover-lift">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <XCircle className="text-[#fca5a5]" size={20} />
+                <h2 className="text-base font-semibold text-[#fca5a5]">Avoid Today</h2>
               </div>
               <button
                 onClick={() => setShowAddHabit('bad')}
-                className="text-[#7dd3fc] hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1a1a1a]"
+                className="text-[#7dd3fc] hover:text-white transition-colors p-1.5 rounded-lg hover:bg-[#1a1a1a]"
               >
-                <Plus size={20} />
+                <Plus size={18} />
               </button>
             </div>
 
             {showAddHabit === 'bad' && (
-              <div className="mb-4 p-4 rounded-xl gradient-bg">
+              <div className="mb-4 p-3 rounded-xl gradient-bg">
                 <input
                   type="text"
                   value={newHabitName}
                   onChange={(e) => setNewHabitName(e.target.value)}
                   placeholder="Enter habit to avoid..."
-                  className="w-full input-field rounded-lg px-3 py-2 text-white placeholder-gray-400"
+                  className="w-full input-field rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-400"
                   onKeyPress={(e) => e.key === 'Enter' && addHabit('bad')}
                   autoFocus
                 />
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => addHabit('bad')}
-                    className="px-4 py-2 bg-[#fca5a5] text-black rounded-lg text-sm font-medium hover:bg-[#fca5a5]/80 transition-colors"
+                    className="px-3 py-1.5 bg-[#fca5a5] text-black rounded-lg text-xs font-medium hover:bg-[#fca5a5]/80 transition-colors"
                   >
                     Add
                   </button>
                   <button
                     onClick={() => setShowAddHabit(null)}
-                    className="px-4 py-2 bg-[#1a1a1a] text-white rounded-lg text-sm hover:bg-[#666] transition-colors"
+                    className="px-3 py-1.5 bg-[#1a1a1a] text-white rounded-lg text-xs hover:bg-[#666] transition-colors"
                   >
                     Cancel
                   </button>
@@ -314,14 +338,14 @@ export default function HabitsSection() {
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {badHabits.map(habit => (
                 <div key={habit.id} className="group">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-all border border-transparent hover:border-gray-800">
-                    <div className="flex items-center space-x-4 flex-1">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-all border border-transparent hover:border-gray-800">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
                       <button
                         onClick={() => toggleHabit(habit.id, 'bad')}
-                        className={`w-6 h-6 rounded-full border-2 transition-all flex-shrink-0 ${habit.completed
+                        className={`w-5 h-5 rounded-full border-2 transition-all flex-shrink-0 ${habit.completed
                           ? 'bg-[#fca5a5] border-[#fca5a5] shadow-lg shadow-[#fca5a5]/30'
                           : 'border-[#666] hover:border-[#fca5a5]'
                           }`}
@@ -341,31 +365,31 @@ export default function HabitsSection() {
                           <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-white p-1"><X size={14} /></button>
                         </div>
                       ) : (
-                        <div className="flex-1 min-w-0">
-                          <span className={`font-medium break-words ${habit.completed ? 'line-through text-gray-500' : ''
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                          <span className={`font-medium text-sm truncate ${habit.completed ? 'line-through text-gray-500' : ''
                             }`}>
                             {habit.name}
                           </span>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {habit.streak} days clean
+                          <div className="text-[10px] text-gray-500 font-mono whitespace-nowrap bg-[#1a1a1a] px-1.5 py-0.5 rounded">
+                            {habit.streak}d
                           </div>
                         </div>
                       )}
                     </div>
 
                     {!editingId && (
-                      <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center ml-2">
                         <button
                           onClick={() => startEdit(habit)}
-                          className="text-gray-400 hover:text-[#7dd3fc] p-2 hover:bg-[#7dd3fc]/10 rounded-lg transition-colors"
+                          className="text-gray-400 hover:text-[#7dd3fc] p-1.5 hover:bg-[#7dd3fc]/10 rounded-lg transition-colors"
                         >
-                          <Pencil size={15} />
+                          <Pencil size={12} />
                         </button>
                         <button
                           onClick={() => promptDelete(habit.id, 'bad')}
-                          className="text-gray-400 hover:text-red-400 p-2 hover:bg-red-500/10 rounded-lg transition-colors ml-1"
+                          className="text-gray-400 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors ml-1"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     )}
@@ -373,7 +397,7 @@ export default function HabitsSection() {
                 </div>
               ))}
               {badHabits.length === 0 && (
-                <p className="text-gray-400 text-center py-8 text-sm">No habits to avoid yet. Add habits you want to break!</p>
+                <p className="text-gray-400 text-center py-6 text-xs">No habits yet.</p>
               )}
             </div>
           </div>

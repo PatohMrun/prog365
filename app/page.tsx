@@ -63,18 +63,33 @@ export default function Home() {
     // RUN DAILY LOGIC CHECK ON LOAD
     Storage.checkDailyReset();
 
-    // Handle online reconnection
-    const handleOnline = () => {
-      // Only refetch if we don't have today's verse
-      const today = new Date().toDateString();
+    // Handle online reconnection & Visibility Change
+    const handleRevalidation = () => {
+      // 1. Run Daily Reset Check
+      Storage.checkDailyReset();
+
+      // 2. Check if we need new Verse
+      const today = new Date().toLocaleDateString('en-CA');
       const cachedDate = localStorage.getItem('verseDate');
       if (cachedDate !== today) {
         fetchVerse(true);
       }
+
+      // 3. Refresh Dashboard Stats
+      loadStats();
     };
 
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    window.addEventListener('online', handleRevalidation);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') handleRevalidation();
+    });
+    window.addEventListener('focus', handleRevalidation);
+
+    return () => {
+      window.removeEventListener('online', handleRevalidation);
+      document.removeEventListener('visibilitychange', handleRevalidation);
+      window.removeEventListener('focus', handleRevalidation);
+    };
   }, []);
 
   const handleDragEnd = (e: any, { offset, velocity }: any) => {
@@ -133,36 +148,51 @@ export default function Home() {
     const projects = Storage.getProjects();
 
     const posCompleted = positive.filter(h => h.completed).length;
-    // For negative habits, 'completed' means FAILED. So Clean = Total - Failed
-    const badFailures = negative.filter(h => h.completed).length;
+
+    // Filter for Active Projects Only
+    const activeProjects = projects.filter(p => !p.status || p.status === 'active');
 
     // Calculate Project status
     let behindCount = 0;
-    projects.forEach(p => {
-      // Simple pacing logic duplication for summary
+    activeProjects.forEach(p => {
       const start = new Date(p.startDate).getTime();
       const end = new Date(p.deadline).getTime();
       const now = Date.now();
+
+      // Check Overdue
+      const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+      if (daysLeft < 0) {
+        behindCount++;
+        return;
+      }
+
+      // Check Pacing
       if (end > start) {
         const timePercent = ((now - start) / (end - start)) * 100;
-        if (p.progress < timePercent - 10) behindCount++;
+        // If Work Progress < Time Elapsed - 10%, it's behind
+        if (p.progress < Math.min(100, Math.max(0, timePercent)) - 10) behindCount++;
       }
     });
+
+
+    const allHabits = [...positive, ...negative];
+    const bestStreak = allHabits.reduce((max, h) => Math.max(max, h.streak), 0);
 
     setStats({
       positiveTotal: positive.length,
       positiveCompleted: posCompleted,
       badTotal: negative.length,
-      badClean: negative.length - badFailures,
-      projectsTotal: projects.length,
-      projectsBehind: behindCount
+      badClean: negative.filter(h => h.completed).length,
+      projectsTotal: activeProjects.length,
+      projectsBehind: behindCount,
+      bestStreak: bestStreak
     });
   };
 
   const fetchVerse = async (forceRefetch = false) => {
     if (typeof window === 'undefined') return;
 
-    const today = new Date().toDateString();
+    const today = new Date().toLocaleDateString('en-CA');
     const cachedDate = localStorage.getItem('verseDate');
     const cachedVerse = localStorage.getItem('cachedVerse');
 
@@ -187,11 +217,9 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Error fetching verse:", error);
-      // Offline Strategy: If fetch fails, try to show the last cached verse (even if old)
       if (cachedVerse) {
         setVerse(JSON.parse(cachedVerse));
       } else {
-        // Fallback only if no cache exists at all
         setVerse({
           text: "Trust in the Lord with all your heart...",
           reference: "Proverbs 3:5-6"
@@ -214,6 +242,7 @@ export default function Home() {
     if (hour < 18) return "Good Afternoon";
     return "Good Evening";
   };
+
 
   const TabContent = () => {
     switch (activeTab) {
@@ -242,66 +271,6 @@ export default function Home() {
       </header>
 
       <section className="mb-6">
-        <div className="glass-card rounded-2xl p-6 relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#7dd3fc]/10 to-transparent opacity-50" />
-
-          <div className="relative z-10">
-            <h2 className="text-lg font-semibold mb-4 text-[#7dd3fc]">Daily Overview</h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Habits Card */}
-              <div
-                onClick={() => handleTabChange('habits')}
-                className="bg-[#0f0f0f]/80 p-4 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors border border-transparent hover:border-[#86efac]/30"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <Target className="text-[#86efac]" size={18} />
-                    <span className="text-xs text-gray-400">Habits</span>
-                  </div>
-                  <span className="text-xl font-bold text-white">{stats.positiveCompleted}/{stats.positiveTotal}</span>
-                </div>
-
-                {/* Visualizing clean streak or failure */}
-                <div className="flex items-center justify-between mt-3 text-xs">
-                  <span className="text-gray-500">Avoided:</span>
-                  <span className={`${stats.badClean === stats.badTotal ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>
-                    {stats.badClean}/{stats.badTotal}
-                  </span>
-                </div>
-              </div>
-
-              {/* Projects Card */}
-              <div
-                onClick={() => handleTabChange('projects')}
-                className="bg-[#0f0f0f]/80 p-4 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors border border-transparent hover:border-[#7dd3fc]/30"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <TrendingUp className="text-[#7dd3fc]" size={18} />
-                    <span className="text-xs text-gray-400">Projects</span>
-                  </div>
-                  <span className="text-xl font-bold text-white">{stats.projectsTotal}</span>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Overall Pacing:</span>
-                  <span className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${stats.projectsBehind > 0
-                      ? 'bg-[#fca5a5]/10 border-[#fca5a5]/20 text-[#fca5a5]'
-                      : 'bg-[#86efac]/10 border-[#86efac]/20 text-[#86efac]'
-                    }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${stats.projectsBehind > 0 ? 'bg-[#fca5a5]' : 'bg-[#86efac]'
-                      }`} />
-                    {stats.projectsBehind > 0 ? `${stats.projectsBehind} Behind` : 'On Track'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mb-6">
         <div
           onClick={() => handleTabChange('verse')}
           className="glass-card rounded-2xl p-6 cursor-pointer hover-lift group relative"
@@ -324,6 +293,85 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      <section className="mb-6">
+        <div className="glass-card rounded-2xl p-6 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#7dd3fc]/10 to-transparent opacity-50" />
+
+          <div className="relative z-10">
+            <h2 className="text-lg font-semibold mb-4 text-[#7dd3fc]">Daily Overview</h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Habits Card - Segregated View */}
+              <div
+                onClick={() => handleTabChange('habits')}
+                className="bg-[#0f0f0f]/80 p-5 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors border border-transparent hover:border-[#86efac]/30 flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Target className="text-[#86efac]" size={20} />
+                    <span className="font-semibold text-white">Habits</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-full border border-orange-400/20">
+                    <Flame size={14} fill="currentColor" />
+                    <span className="text-xs font-bold">{stats.bestStreak} day streak</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Positive Stats */}
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Building</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xl font-bold text-[#86efac]">{stats.positiveCompleted}</span>
+                      <span className="text-sm text-gray-500">/ {stats.positiveTotal}</span>
+                    </div>
+                  </div>
+
+                  {/* Negative Stats */}
+                  <div className="flex flex-col border-l border-gray-800 pl-4">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Avoiding</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-xl font-bold ${stats.badClean === stats.badTotal ? 'text-[#86efac]' : 'text-[#fca5a5]'}`}>
+                        {stats.badClean}
+                      </span>
+                      <span className="text-sm text-gray-500">/ {stats.badTotal}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Projects Card */}
+              <div
+                onClick={() => handleTabChange('projects')}
+                className="bg-[#0f0f0f]/80 p-4 rounded-xl cursor-pointer hover:bg-[#1a1a1a] transition-colors border border-transparent hover:border-[#7dd3fc]/30"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="text-[#7dd3fc]" size={18} />
+                    <span className="text-xs text-gray-400">Projects</span>
+                  </div>
+                  <span className="text-xl font-bold text-white">{stats.projectsTotal}</span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Overall Pacing:</span>
+                  <span className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${stats.projectsBehind > 0
+                    ? 'bg-[#fca5a5]/10 border-[#fca5a5]/20 text-[#fca5a5]'
+                    : 'bg-[#86efac]/10 border-[#86efac]/20 text-[#86efac]'
+                    }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${stats.projectsBehind > 0 ? 'bg-[#fca5a5]' : 'bg-[#86efac]'
+                      }`} />
+                    {stats.projectsBehind > 0 ? `${stats.projectsBehind} Behind` : 'On Track'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section >
+
+
 
       <section>
         <h3 className="text-sm font-semibold text-gray-500 mb-4 px-1">QUICK ACTIONS</h3>
@@ -349,7 +397,7 @@ export default function Home() {
           </button>
         </div>
       </section>
-    </div>
+    </div >
   );
 
   return (

@@ -8,7 +8,8 @@ export default function ProfileSection() {
         positiveCount: 0,
         badCount: 0,
         projectsCount: 0,
-        streak: 0
+        bestStreak: 0,
+        todayCompletion: 0
     });
 
     useEffect(() => {
@@ -16,11 +17,21 @@ export default function ProfileSection() {
         const savedBad = JSON.parse(localStorage.getItem('badHabits') || '[]');
         const savedProjects = JSON.parse(localStorage.getItem('projects') || '[]');
 
+        // Calculate Best Streak
+        const allHabits = [...savedPositive, ...savedBad];
+        const bestStreak = allHabits.reduce((max: number, h: any) => Math.max(max, h.streak || 0), 0);
+
+        // Calculate Today's Completion
+        const total = allHabits.length;
+        const completed = allHabits.filter((h: any) => h.completed).length;
+        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
         setStats({
             positiveCount: savedPositive.length,
             badCount: savedBad.length,
-            projectsCount: savedProjects.length,
-            streak: 0 // Placeholder logic for now
+            projectsCount: savedProjects.filter((p: any) => !p.status || p.status === 'active').length,
+            bestStreak: bestStreak,
+            todayCompletion: percent
         });
     }, []);
 
@@ -36,21 +47,23 @@ export default function ProfileSection() {
                     <div className="glass-card rounded-2xl p-8">
                         <h2 className="text-lg font-semibold mb-6 text-[#86efac]">Statistics</h2>
                         <div className="grid grid-cols-2 gap-6">
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-[#7dd3fc]">{stats.positiveCount}</div>
-                                <div className="text-gray-400 text-sm">Positive Habits</div>
+                            <div className="text-center p-4 rounded-xl bg-[#0f0f0f]/50">
+                                <div className="text-3xl font-bold text-[#86efac]">{stats.positiveCount}</div>
+                                <div className="text-gray-400 text-xs mt-1">Building</div>
                             </div>
-                            <div className="text-center">
+                            <div className="text-center p-4 rounded-xl bg-[#0f0f0f]/50">
                                 <div className="text-3xl font-bold text-[#fca5a5]">{stats.badCount}</div>
-                                <div className="text-gray-400 text-sm">Habits to Avoid</div>
+                                <div className="text-gray-400 text-xs mt-1">Avoiding</div>
                             </div>
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-[#86efac]">{stats.projectsCount}</div>
-                                <div className="text-gray-400 text-sm">Active Projects</div>
+                            <div className="text-center p-4 rounded-xl bg-[#0f0f0f]/50">
+                                <div className="text-3xl font-bold text-orange-400 flex items-center justify-center gap-1">
+                                    {stats.bestStreak} <span className="text-base font-normal text-orange-400/70">days</span>
+                                </div>
+                                <div className="text-gray-400 text-xs mt-1">Best Streak</div>
                             </div>
-                            <div className="text-center">
-                                <div className="text-3xl font-bold text-[#7dd3fc]">{stats.streak}</div>
-                                <div className="text-gray-400 text-sm">Days Streak</div>
+                            <div className="text-center p-4 rounded-xl bg-[#0f0f0f]/50">
+                                <div className="text-3xl font-bold text-[#7dd3fc]">{stats.todayCompletion}%</div>
+                                <div className="text-gray-400 text-xs mt-1">Today's Focus</div>
                             </div>
                         </div>
                     </div>
