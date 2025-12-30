@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User } from "lucide-react";
+import { User, LogOut } from "lucide-react";
+import { supabase } from "../utils/supabase";
 
 export default function ProfileSection() {
     const [stats, setStats] = useState({
@@ -82,6 +83,18 @@ export default function ProfileSection() {
                             <button className="w-full text-left p-4 rounded-lg bg-[#0f0f0f] hover:bg-[#1a1a1a] transition-colors">
                                 <div className="font-medium">Reset Progress</div>
                                 <div className="text-gray-400 text-sm">Clear all data and start fresh</div>
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    await supabase.auth.signOut();
+                                    window.location.href = '/login';
+                                }}
+                                className="w-full text-left p-4 rounded-lg bg-red-500/10 hover:bg-red-500/20 transition-colors group"
+                            >
+                                <div className="font-medium text-red-500 flex items-center gap-2">
+                                    <LogOut size={16} /> Sign Out
+                                </div>
+                                <div className="text-red-400/60 text-sm group-hover:text-red-400">End your current session</div>
                             </button>
                         </div>
                     </div>

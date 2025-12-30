@@ -9,6 +9,7 @@ import HabitsSection from "./components/HabitsSection";
 import ProjectsSection from "./components/ProjectsSection";
 import ProfileSection from "./components/ProfileSection";
 import { Storage } from "./utils/storage";
+import { supabase } from "./utils/supabase";
 
 interface BibleVerse {
   text: string;
@@ -53,6 +54,15 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Check Session (Auth Guard)
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = '/login';
+      }
+    };
+    checkSession();
+
     // Check URL on initial load to restore tab
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
