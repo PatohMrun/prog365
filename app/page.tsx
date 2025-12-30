@@ -70,7 +70,7 @@ export default function Home() {
 
       // 2. Check if we need new Verse
       const today = new Date().toLocaleDateString('en-CA');
-      const cachedDate = localStorage.getItem('verseDate');
+      const cachedDate = localStorage.getItem('verseDate_local');
       if (cachedDate !== today) {
         fetchVerse(true);
       }
@@ -193,8 +193,8 @@ export default function Home() {
     if (typeof window === 'undefined') return;
 
     const today = new Date().toLocaleDateString('en-CA');
-    const cachedDate = localStorage.getItem('verseDate');
-    const cachedVerse = localStorage.getItem('cachedVerse');
+    const cachedDate = localStorage.getItem('verseDate_local');
+    const cachedVerse = localStorage.getItem('cachedVerse_local');
 
     if (!forceRefetch && cachedDate === today && cachedVerse) {
       setVerse(JSON.parse(cachedVerse));
@@ -204,7 +204,7 @@ export default function Home() {
 
     try {
       setLoading(true);
-      const response = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
+      const response = await fetch('https://labs.bible.org/api/?passage=random&type=json');
       const data = await response.json();
       if (data && data[0]) {
         const newVerse = {
@@ -212,8 +212,8 @@ export default function Home() {
           reference: `${data[0].bookname} ${data[0].chapter}:${data[0].verse}`
         };
         setVerse(newVerse);
-        localStorage.setItem('cachedVerse', JSON.stringify(newVerse));
-        localStorage.setItem('verseDate', today);
+        localStorage.setItem('cachedVerse_local', JSON.stringify(newVerse));
+        localStorage.setItem('verseDate_local', today);
       }
     } catch (error) {
       console.error("Error fetching verse:", error);

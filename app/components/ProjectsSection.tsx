@@ -32,9 +32,11 @@ export default function ProjectsSection() {
     const addProject = () => {
         if (!newProjectName.trim()) return;
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA');
         // Default deadline: 30 days from now if not specified
-        const defaultDeadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const deadlineDate = new Date();
+        deadlineDate.setDate(deadlineDate.getDate() + 30);
+        const defaultDeadline = deadlineDate.toLocaleDateString('en-CA');
 
         const newProject: Project = {
             id: Date.now().toString(),
@@ -100,7 +102,7 @@ export default function ProjectsSection() {
     };
 
     const completeProject = (project: Project) => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA');
         const updated = projects.map(p =>
             p.id === project.id ? {
                 ...p,
@@ -115,19 +117,25 @@ export default function ProjectsSection() {
 
     // Calculate Pacing Logic
     const getPacingStats = (project: Project) => {
-        const start = new Date(project.startDate).getTime();
-        const end = new Date(project.deadline).getTime();
-        const now = Date.now();
+        const todayStr = new Date().toLocaleDateString('en-CA');
 
-        // Days remaining
-        const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+        // Use UTC-parsed dates for day-difference to avoid timezone offsets causing "7PM overdue" issues
+        const deadlineDate = new Date(project.deadline);
+        const todayDate = new Date(todayStr);
+        const startDate = new Date(project.startDate);
+
+        // Days remaining (Integrally)
+        const diffTime = deadlineDate.getTime() - todayDate.getTime();
+        const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         const isOverdue = daysLeft < 0;
 
         // Prevent division by zero or future starts
-        if (end <= start) return { status: 'on_track', message: 'No Time Tracking', isOverdue, daysLeft, timePercent: 0, gap: 0 };
+        if (deadlineDate <= startDate) return { status: 'on_track', message: 'No Time Tracking', isOverdue, daysLeft, timePercent: 0, gap: 0 };
 
-        const totalDuration = end - start;
-        const elapsed = now - start;
+        const totalDuration = deadlineDate.getTime() - startDate.getTime();
+        const elapsed = todayDate.getTime() - startDate.getTime();
+
+        // Clamp time percent
         const timePercent = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
 
         // Pacing: Work Progress vs Time Elapsed
