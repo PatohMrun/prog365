@@ -21,7 +21,23 @@ export interface Project {
     status?: 'active' | 'completed' | 'archived';
 }
 
+export interface Reflection {
+    id: string;
+    date: string; // YYYY-MM-DD
+    text: string;
+    verseReference?: string; // Optional context
+}
+
 export const Storage = {
+    getReflections: (): Reflection[] => {
+        if (typeof window === 'undefined') return [];
+        return JSON.parse(localStorage.getItem('reflections') || '[]');
+    },
+
+    saveReflections: (reflections: Reflection[]) => {
+        localStorage.setItem('reflections', JSON.stringify(reflections));
+    },
+
     getHabits: (): { positive: Habit[], negative: Habit[] } => {
         if (typeof window === 'undefined') return { positive: [], negative: [] };
 

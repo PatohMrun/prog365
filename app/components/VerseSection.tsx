@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, RefreshCw } from "lucide-react";
+import { BookOpen, RefreshCw, Calendar, X, ChevronRight } from "lucide-react";
+import { Storage, Reflection } from "../utils/storage";
 
 interface BibleVerse {
   text: string;
@@ -15,10 +16,65 @@ interface VerseSectionProps {
 }
 
 export default function VerseSection({ verse, loading, onRefresh }: VerseSectionProps) {
+  const [reflectionText, setReflectionText] = useState("");
+  const [reflections, setReflections] = useState<Reflection[]>([]);
+  const [selectedReflection, setSelectedReflection] = useState<Reflection | null>(null);
+
+  useEffect(() => {
+    setReflections(Storage.getReflections());
+  }, []);
+
+  const handleSave = () => {
+    if (!reflectionText.trim()) return;
+
+    const newReflection: Reflection = {
+      id: Date.now().toString(),
+      date: new Date().toLocaleDateString('en-CA'),
+      text: reflectionText.trim(),
+      verseReference: verse?.reference
+    };
+
+    const updated = [newReflection, ...reflections];
+    setReflections(updated);
+    Storage.saveReflections(updated);
+    setReflectionText("");
+  };
 
   return (
-    <div className="min-h-screen bg-transparent text-white pb-20 px-4 pt-6">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-transparent text-white pb-24 px-4 pt-6 relative">
+      {/* Detail Modal */}
+      {selectedReflection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="glass-card rounded-2xl p-6 max-w-lg w-full shadow-2xl scale-100 animate-scale-in border border-[#7dd3fc]/20 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4 border-b border-gray-800 pb-4">
+              <div className="flex items-center gap-2 text-[#7dd3fc]">
+                <Calendar size={18} />
+                <span className="font-mono text-sm">{selectedReflection.date}</span>
+              </div>
+              <button
+                onClick={() => setSelectedReflection(null)}
+                className="text-gray-400 hover:text-white p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto custom-scrollbar flex-1">
+              {selectedReflection.verseReference && (
+                <p className="text-xs text-gray-500 mb-4 italic border-l-2 border-gray-700 pl-3">
+                  Re: {selectedReflection.verseReference}
+                </p>
+              )}
+              <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
+                {selectedReflection.text}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Active Verse Card */}
         <div className="glass-card rounded-2xl p-6 hover-lift animate-fade-in">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
@@ -36,10 +92,9 @@ export default function VerseSection({ verse, loading, onRefresh }: VerseSection
 
           {loading ? (
             <div className="animate-pulse space-y-4">
-              <div className="h-6 bg-[#1a1a1a] rounded w-full"></div>
-              <div className="h-6 bg-[#1a1a1a] rounded w-3/4"></div>
-              <div className="h-6 bg-[#1a1a1a] rounded w-1/2"></div>
-              <div className="h-4 bg-[#1a1a1a] rounded w-1/3 mt-6"></div>
+              <div className="h-4 bg-[#1a1a1a] rounded w-full"></div>
+              <div className="h-4 bg-[#1a1a1a] rounded w-3/4"></div>
+              <div className="h-4 bg-[#1a1a1a] rounded w-1/2"></div>
             </div>
           ) : verse && (
             <div className="space-y-4">
@@ -53,17 +108,57 @@ export default function VerseSection({ verse, loading, onRefresh }: VerseSection
           )}
         </div>
 
-        <div className="mt-6 glass-card rounded-2xl p-6">
-          <h3 className="text-sm font-semibold mb-3 text-[#86efac]">Reflection</h3>
+        {/* Input Area */}
+        <div className="glass-card rounded-2xl p-6">
+          <h3 className="text-sm font-semibold mb-3 text-[#86efac]">Reflect</h3>
           <textarea
-            placeholder="Write your thoughts about today's verse..."
+            value={reflectionText}
+            onChange={(e) => setReflectionText(e.target.value)}
+            placeholder="Write your thoughts..."
             style={{ touchAction: "pan-y" }}
-            className="w-full h-32 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-4 text-white placeholder-gray-400 resize-none focus:border-[#7dd3fc] focus:outline-none touch-pan-y"
+            className="w-full h-24 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-3 text-sm text-white placeholder-gray-500 resize-none focus:border-[#7dd3fc] focus:outline-none touch-pan-y"
           />
-          <button className="mt-4 px-6 py-2 bg-[#7dd3fc] text-black rounded-lg font-medium hover:bg-[#7dd3fc]/80 transition-colors">
-            Save Reflection
-          </button>
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={handleSave}
+              className="px-4 py-1.5 bg-[#7dd3fc] text-black text-xs font-bold rounded-lg hover:bg-[#7dd3fc]/80 transition-colors"
+            >
+              Save Note
+            </button>
+          </div>
         </div>
+
+        {/* History Table */}
+        {reflections.length > 0 && (
+          <div className="glass-card rounded-2xl p-6 animate-fade-in">
+            <h3 className="text-sm font-semibold mb-4 text-gray-400 uppercase tracking-wider">History</h3>
+            <div className="overflow-hidden">
+              <table className="w-full border-collapse">
+                <tbody className="divide-y divide-gray-800/50">
+                  {reflections.map((ref) => (
+                    <tr
+                      key={ref.id}
+                      onClick={() => setSelectedReflection(ref)}
+                      className="group cursor-pointer hover:bg-[#1a1a1a] transition-colors"
+                    >
+                      <td className="py-3 pl-1 pr-4 whitespace-nowrap align-top w-24">
+                        <span className="text-[10px] sm:text-xs font-mono text-[#7dd3fc] opacity-80">{ref.date}</span>
+                      </td>
+                      <td className="py-3 pr-2 align-top">
+                        <p className="text-xs sm:text-sm text-gray-300 line-clamp-1 group-hover:text-white transition-colors">
+                          {ref.text}
+                        </p>
+                      </td>
+                      <td className="py-3 pr-1 align-top w-6 text-right">
+                        <ChevronRight size={14} className="text-gray-600 group-hover:text-[#7dd3fc] transition-colors" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
