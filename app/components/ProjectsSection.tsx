@@ -200,8 +200,8 @@ export default function ProjectsSection() {
             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center space-x-3">
-                        <BarChart3 className="text-[#7dd3fc]" size={28} />
-                        <h1 className="text-3xl font-bold text-[#7dd3fc]">Projects</h1>
+                        <BarChart3 className="text-[#7dd3fc]" size={24} />
+                        <h1 className="text-2xl font-bold text-[#7dd3fc]">Projects</h1>
                     </div>
 
                     {/* Tabs */}

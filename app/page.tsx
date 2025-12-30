@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, CheckCircle, XCircle, Calendar, Target, Plus, ArrowRight, TrendingUp, AlertCircle, Shield, Flame } from "lucide-react";
+import { BookOpen, CheckCircle, XCircle, Calendar, Target, Plus, ArrowRight, TrendingUp, AlertCircle, Shield, Flame, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BottomNav from "./components/BottomNav";
 import VerseSection from "./components/VerseSection";
@@ -185,7 +185,6 @@ export default function Home() {
       badClean: negative.filter(h => h.completed).length,
       projectsTotal: activeProjects.length,
       projectsBehind: behindCount,
-      bestStreak: bestStreak
     });
   };
 
@@ -288,7 +287,12 @@ export default function Home() {
           ) : verse && (
             <>
               <p className="text-gray-300 text-sm line-clamp-2 italic mb-2">"{verse.text}"</p>
-              <p className="text-xs text-[#7dd3fc] text-right font-medium">— {verse.reference}</p>
+              <p className="text-xs text-[#7dd3fc] text-right font-medium mb-3">— {verse.reference}</p>
+              <div className="flex justify-end">
+                <div className="p-2 rounded-full bg-[#7dd3fc]/10 text-[#7dd3fc] group-hover:bg-[#7dd3fc] group-hover:text-black transition-all duration-300">
+                  <MessageSquare size={16} />
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -311,10 +315,6 @@ export default function Home() {
                   <div className="flex items-center space-x-2">
                     <Target className="text-[#86efac]" size={20} />
                     <span className="font-semibold text-white">Habits</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5 text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-full border border-orange-400/20">
-                    <Flame size={14} fill="currentColor" />
-                    <span className="text-xs font-bold">{stats.bestStreak} day streak</span>
                   </div>
                 </div>
 

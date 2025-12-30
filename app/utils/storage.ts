@@ -8,6 +8,7 @@ export interface Habit {
     streak: number;
     history: string[]; // ISO date strings
     lastChecked: string; // ISO date string
+    status?: 'active' | 'archived';
 }
 
 export interface Project {
@@ -56,7 +57,8 @@ export const Storage = {
             completed: h.completed || false,
             streak: h.streak || 0,
             history: h.history || [],
-            lastChecked: h.lastChecked || today
+            lastChecked: h.lastChecked || today,
+            status: h.status || 'active'
         });
 
         positive = positive.map((h: any) => migrate(h, 'positive'));

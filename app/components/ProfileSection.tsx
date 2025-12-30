@@ -39,8 +39,8 @@ export default function ProfileSection() {
         <div className="min-h-screen bg-transparent text-white pb-20 px-4 pt-6">
             <div className="max-w-2xl mx-auto">
                 <div className="flex items-center space-x-3 mb-8">
-                    <User className="text-[#7dd3fc]" size={28} />
-                    <h1 className="text-3xl font-bold text-[#7dd3fc]">Profile</h1>
+                    <User className="text-[#7dd3fc]" size={24} />
+                    <h1 className="text-2xl font-bold text-[#7dd3fc]">Profile</h1>
                 </div>
 
                 <div className="space-y-6">

@@ -141,15 +141,15 @@ export default function VerseSection({ verse, loading, onRefresh }: VerseSection
                       onClick={() => setSelectedReflection(ref)}
                       className="group cursor-pointer hover:bg-[#1a1a1a] transition-colors"
                     >
-                      <td className="py-3 pl-1 pr-4 whitespace-nowrap align-top w-24">
+                      <td className="py-3 pl-1 pr-4 whitespace-nowrap align-middle w-24">
                         <span className="text-[10px] sm:text-xs font-mono text-[#7dd3fc] opacity-80">{ref.date}</span>
                       </td>
-                      <td className="py-3 pr-2 align-top">
+                      <td className="py-3 pr-2 align-middle">
                         <p className="text-xs sm:text-sm text-gray-300 line-clamp-1 group-hover:text-white transition-colors">
                           {ref.text}
                         </p>
                       </td>
-                      <td className="py-3 pr-1 align-top w-6 text-right">
+                      <td className="py-3 pr-1 align-middle w-6 text-right">
                         <ChevronRight size={14} className="text-gray-600 group-hover:text-[#7dd3fc] transition-colors" />
                       </td>
                     </tr>
