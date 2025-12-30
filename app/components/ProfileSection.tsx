@@ -34,7 +34,7 @@ export default function ProfileSection() {
 
                 <div className="space-y-6">
                     <div className="glass-card rounded-2xl p-8">
-                        <h2 className="text-xl font-semibold mb-6 text-[#86efac]">Statistics</h2>
+                        <h2 className="text-lg font-semibold mb-6 text-[#86efac]">Statistics</h2>
                         <div className="grid grid-cols-2 gap-6">
                             <div className="text-center">
                                 <div className="text-3xl font-bold text-[#7dd3fc]">{stats.positiveCount}</div>
