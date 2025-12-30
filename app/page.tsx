@@ -8,22 +8,12 @@ import VerseSection from "./components/VerseSection";
 import HabitsSection from "./components/HabitsSection";
 import ProjectsSection from "./components/ProjectsSection";
 import ProfileSection from "./components/ProfileSection";
-import { Storage } from "./utils/storage";
 import { supabase } from "./utils/supabase";
+import { getUserProfile } from "./actions/user";
+import { getHabits } from "./actions/habits";
+import { getProjects } from "./actions/projects";
 
-interface BibleVerse {
-  text: string;
-  reference: string;
-}
-
-interface SummaryStats {
-  positiveTotal: number;
-  positiveCompleted: number;
-  badTotal: number;
-  badClean: number;
-  projectsTotal: number;
-  projectsBehind: number;
-}
+// ... interfaces ...
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
@@ -42,41 +32,78 @@ export default function Home() {
   const tabs = ['home', 'verse', 'habits', 'projects', 'profile'];
 
   const handleTabChange = (newTab: string) => {
-    const newIndex = tabs.indexOf(newTab);
-    const oldIndex = tabs.indexOf(activeTab);
-    setDirection(newIndex > oldIndex ? 1 : -1);
+    if (newTab === activeTab) return;
+    const newIdx = tabs.indexOf(newTab);
+    const oldIdx = tabs.indexOf(activeTab);
+    setDirection(newIdx > oldIdx ? 1 : -1);
     setActiveTab(newTab);
+  };
 
-    // Efficiently update URL without triggering navigation
-    const url = new URL(window.location.href);
-    url.searchParams.set('tab', newTab);
-    window.history.replaceState({}, '', url);
+  const handleDragEnd = (e: any, { offset, velocity }: any) => {
+    const swipe = Math.abs(offset.x) * velocity.x;
+
+    if (swipe < -10000) {
+      // swiped right (next)
+      const currentIndex = tabs.indexOf(activeTab);
+      if (currentIndex < tabs.length - 1) handleTabChange(tabs[currentIndex + 1]);
+    } else if (swipe > 10000) {
+      // swiped left (prev)
+      const currentIndex = tabs.indexOf(activeTab);
+      if (currentIndex > 0) handleTabChange(tabs[currentIndex - 1]);
+    }
+  };
+
+  const variants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 300 : -300,
+      opacity: 0,
+      scale: 0.95
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1,
+      scale: 1
+    },
+    exit: (direction: number) => ({
+      zIndex: 0,
+      x: direction < 0 ? 300 : -300,
+      opacity: 0,
+      scale: 0.95
+    })
   };
 
   useEffect(() => {
-    // Check Session (Auth Guard)
+    // ... checkSession ...
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         window.location.href = '/login';
+        return;
       }
+
+      // Check for Profile (Onboarding)
+      const userProfile = await getUserProfile(session.user.email!);
+      if (!userProfile || !userProfile.name) {
+        window.location.href = '/onboarding';
+      }
+
+      // Load Stats after auth confirmed
+      loadStats(session.user.email!);
     };
     checkSession();
 
-    // Check URL on initial load to restore tab
+    // ... url check ...
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
     if (tabParam && tabs.includes(tabParam)) {
       setActiveTab(tabParam);
     }
 
-    // RUN DAILY LOGIC CHECK ON LOAD
-    Storage.checkDailyReset();
-
     // Handle online reconnection & Visibility Change
-    const handleRevalidation = () => {
-      // 1. Run Daily Reset Check
-      Storage.checkDailyReset();
+    const handleRevalidation = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) loadStats(session.user.email);
 
       // 2. Check if we need new Verse
       const today = new Date().toLocaleDateString('en-CA');
@@ -84,9 +111,6 @@ export default function Home() {
       if (cachedDate !== today) {
         fetchVerse(true);
       }
-
-      // 3. Refresh Dashboard Stats
-      loadStats();
     };
 
     window.addEventListener('online', handleRevalidation);
@@ -102,43 +126,6 @@ export default function Home() {
     };
   }, []);
 
-  const handleDragEnd = (e: any, { offset, velocity }: any) => {
-    const swipeConfidenceThreshold = 200;
-    const swipePower = Math.abs(offset.x) * velocity.x;
-
-    const currentIndex = tabs.indexOf(activeTab);
-
-    if (swipePower < -swipeConfidenceThreshold) {
-      if (currentIndex < tabs.length - 1) {
-        handleTabChange(tabs[currentIndex + 1]);
-      }
-    } else if (swipePower > swipeConfidenceThreshold) {
-      if (currentIndex > 0) {
-        handleTabChange(tabs[currentIndex - 1]);
-      }
-    }
-  };
-
-  const variants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? '100%' : '-100%',
-      opacity: 0,
-      position: 'absolute' as const // Ensure absolute positioning for overlap
-    }),
-    center: {
-      zIndex: 1,
-      x: 0,
-      opacity: 1,
-      position: 'relative' as const
-    },
-    exit: (direction: number) => ({
-      zIndex: 0,
-      x: direction < 0 ? '100%' : '-100%',
-      opacity: 0,
-      position: 'absolute' as const
-    })
-  };
-
   // Fetch Verse ONLY ONCE on mount
   useEffect(() => {
     fetchVerse();
@@ -146,25 +133,29 @@ export default function Home() {
 
   // Sync Stats when returning to Home or checking profile
   useEffect(() => {
-    if (activeTab === 'home' || activeTab === 'profile') {
-      loadStats();
-    }
+    const sync = async () => {
+      if (activeTab === 'home' || activeTab === 'profile') {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email) loadStats(session.user.email);
+      }
+    };
+    sync();
   }, [activeTab]);
 
-  const loadStats = () => {
+  const loadStats = async (email: string) => {
     if (typeof window === 'undefined') return;
 
-    const { positive, negative } = Storage.getHabits();
-    const projects = Storage.getProjects();
+    const { positive, negative } = await getHabits(email);
+    const projects = await getProjects(email);
 
-    const posCompleted = positive.filter(h => h.completed).length;
+    const posCompleted = positive.filter((h: any) => h.completed).length;
 
     // Filter for Active Projects Only
-    const activeProjects = projects.filter(p => !p.status || p.status === 'active');
+    const activeProjects = projects.filter((p: any) => !p.status || p.status === 'active');
 
     // Calculate Project status
     let behindCount = 0;
-    activeProjects.forEach(p => {
+    activeProjects.forEach((p: any) => {
       const start = new Date(p.startDate).getTime();
       const end = new Date(p.deadline).getTime();
       const now = Date.now();
@@ -186,13 +177,14 @@ export default function Home() {
 
 
     const allHabits = [...positive, ...negative];
-    const bestStreak = allHabits.reduce((max, h) => Math.max(max, h.streak), 0);
+
 
     setStats({
       positiveTotal: positive.length,
       positiveCompleted: posCompleted,
       badTotal: negative.length,
-      badClean: negative.filter(h => h.completed).length,
+      badClean: negative.filter((h: any) => h.completed).length,
+
       projectsTotal: activeProjects.length,
       projectsBehind: behindCount,
     });

@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { BarChart3, Plus, Trash2, Calendar, TrendingUp, AlertCircle, CheckCircle2, Pencil, Archive, Check } from "lucide-react";
-import { Storage, Project } from "../utils/storage";
+import { getProjects, createProject, updateProject, updateProjectStatus } from "../actions/projects";
+import { supabase } from "../utils/supabase";
 
 export default function ProjectsSection() {
-    const [projects, setProjects] = useState<Project[]>([]);
+    const [projects, setProjects] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
     // Create Flow
@@ -22,15 +23,22 @@ export default function ProjectsSection() {
     const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
     useEffect(() => {
-        refreshData();
+        loadProjects();
     }, []);
 
-    const refreshData = () => {
-        setProjects(Storage.getProjects());
+    const loadProjects = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.email) return;
+
+        const data = await getProjects(session.user.email);
+        setProjects(data);
     };
 
-    const addProject = () => {
+    const addProject = async () => {
         if (!newProjectName.trim()) return;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.email) return;
 
         const today = new Date().toLocaleDateString('en-CA');
         // Default deadline: 30 days from now if not specified
@@ -38,85 +46,69 @@ export default function ProjectsSection() {
         deadlineDate.setDate(deadlineDate.getDate() + 30);
         const defaultDeadline = deadlineDate.toLocaleDateString('en-CA');
 
-        const newProject: Project = {
-            id: Date.now().toString(),
-            name: newProjectName.trim(),
-            progress: 0,
-            lastUpdated: 'Just created',
-            startDate: today,
-            deadline: newProjectDeadline || defaultDeadline,
-            status: 'active'
-        };
-
-        const updated = [...projects, newProject];
-        Storage.saveProjects(updated);
-        setProjects(updated);
+        await createProject(session.user.email, newProjectName.trim(), today, newProjectDeadline || defaultDeadline);
 
         setNewProjectName('');
         setNewProjectDeadline('');
         setShowAddProject(false);
+        loadProjects();
     };
 
     const promptDelete = (id: string) => {
         setProjectToDelete(id);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (!projectToDelete) return;
-        const updated = projects.filter(p => p.id !== projectToDelete);
-        Storage.saveProjects(updated);
-        setProjects(updated);
+
+        await updateProjectStatus(projectToDelete, 'deleted');
         setProjectToDelete(null);
+        loadProjects();
     };
 
-    const startEdit = (project: Project) => {
+    const startEdit = (project: any) => {
         setEditingId(project.id);
         setEditName(project.name);
-        setEditDeadline(project.deadline);
+        // Ensure date string format for input
+        const deadline = new Date(project.deadline).toISOString().split('T')[0];
+        setEditDeadline(deadline);
     };
 
-    const saveEdit = () => {
+    const saveEdit = async () => {
         if (!editingId || !editName.trim()) {
             setEditingId(null);
             return;
         }
 
-        const updated = projects.map(p =>
-            p.id === editingId ? { ...p, name: editName.trim(), deadline: editDeadline || p.deadline } : p
-        );
-        Storage.saveProjects(updated);
-        setProjects(updated);
+        await updateProject(editingId, {
+            name: editName.trim(),
+            deadline: editDeadline
+        });
+
         setEditingId(null);
+        loadProjects();
     };
 
-    const updateProgress = (id: string, delta: number) => {
-        const updated = projects.map(p =>
-            p.id === id ? {
-                ...p,
-                progress: Math.max(0, Math.min(100, p.progress + delta)),
-                lastUpdated: 'Just now'
-            } : p
-        );
-        Storage.saveProjects(updated);
-        setProjects(updated);
+    const updateProgress = async (id: string, delta: number) => {
+        const project = projects.find(p => p.id === id);
+        if (!project) return;
+
+        const newProgress = Math.max(0, Math.min(100, project.progress + delta));
+
+        // Optimistic UI
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, progress: newProgress } : p));
+
+        await updateProject(id, { progress: newProgress });
+        loadProjects(); // Sync/Revalidate
     };
 
-    const completeProject = (project: Project) => {
-        const today = new Date().toLocaleDateString('en-CA');
-        const updated = projects.map(p =>
-            p.id === project.id ? {
-                ...p,
-                progress: 100,
-                status: 'completed' as const,
-                completedDate: today
-            } : p
-        );
-        Storage.saveProjects(updated);
-        setProjects(updated);
+    const completeProject = async (project: any) => {
+        await updateProjectStatus(project.id, 'completed');
+        loadProjects();
     };
 
     // Calculate Pacing Logic
-    const getPacingStats = (project: Project) => {
+    const getPacingStats = (project: any) => {
         const todayStr = new Date().toLocaleDateString('en-CA');
 
         // Use UTC-parsed dates for day-difference to avoid timezone offsets causing "7PM overdue" issues
@@ -150,7 +142,7 @@ export default function ProjectsSection() {
         return { status, timePercent, gap, daysLeft, isOverdue };
     };
 
-    const getHistoryStatus = (project: Project) => {
+    const getHistoryStatus = (project: any) => {
         if (!project.completedDate) return 'abandoned';
 
         // Use midnight comparison to be safe
@@ -439,7 +431,7 @@ export default function ProjectsSection() {
                                             <div className="min-w-0 flex flex-col">
                                                 <h3 className="font-medium text-sm text-gray-200 truncate pr-2">{project.name}</h3>
                                                 <p className="text-[10px] text-gray-500 truncate">
-                                                    {project.completedDate}
+                                                    {project.completedDate ? new Date(project.completedDate).toLocaleDateString() : 'Unknown date'}
                                                 </p>
                                             </div>
                                         </div>

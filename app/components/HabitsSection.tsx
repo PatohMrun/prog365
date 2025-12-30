@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Check, Trash2, Edit2, Shield, Flame, Archive, RotateCcw, X, AlertTriangle } from "lucide-react";
-import { Storage, Habit } from "../utils/storage";
+import { getHabits, createHabit, toggleHabit, updateHabitName, updateHabitStatus } from "../actions/habits";
+import { supabase } from "../utils/supabase";
 
 export default function HabitsSection() {
-  const [positiveHabits, setPositiveHabits] = useState<Habit[]>([]);
-  const [badHabits, setBadHabits] = useState<Habit[]>([]);
+  const [positiveHabits, setPositiveHabits] = useState<any[]>([]);
+  const [badHabits, setBadHabits] = useState<any[]>([]);
   const [newHabitName, setNewHabitName] = useState('');
 
   // Tab State
@@ -23,151 +24,67 @@ export default function HabitsSection() {
     loadHabits();
   }, []);
 
-  const loadHabits = () => {
-    const { positive, negative } = Storage.getHabits();
+  const loadHabits = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.email) return;
+
+    const { positive, negative } = await getHabits(session.user.email);
     setPositiveHabits(positive);
     setBadHabits(negative);
   };
 
-  const saveToStorage = (pos: Habit[], neg: Habit[]) => {
-    Storage.saveHabits(pos, neg);
-  };
-
-  const addHabit = (type: 'positive' | 'bad') => {
+  const addHabit = async (type: 'positive' | 'bad') => {
     if (!newHabitName.trim()) return;
 
-    const today = new Date().toLocaleDateString('en-CA');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.email) return;
 
-    const newHabit: Habit = {
-      id: Date.now().toString(),
-      name: newHabitName.trim(),
-      type: type === 'positive' ? 'positive' : 'negative',
-      completed: false,
-      streak: 0,
-      history: [],
-      lastChecked: today,
-      status: 'active'
-    };
-
-    if (type === 'positive') {
-      const updated = [...positiveHabits, newHabit];
-      setPositiveHabits(updated);
-      saveToStorage(updated, badHabits);
-    } else {
-      const updated = [...badHabits, newHabit];
-      setBadHabits(updated);
-      saveToStorage(positiveHabits, updated);
-    }
+    await createHabit(session.user.email, newHabitName.trim(), type === 'positive' ? 'positive' : 'negative');
     setNewHabitName('');
+    loadHabits(); // Refresh data
   };
 
-  const toggleHabit = (id: string, type: 'positive' | 'bad') => {
-    const today = new Date().toLocaleDateString('en-CA');
+  const handleToggle = async (id: string) => {
+    // Optimistic Update
+    const updater = (h: any) => h.id === id ? { ...h, completed: !h.completed } : h;
+    setPositiveHabits(prev => prev.map(updater));
+    setBadHabits(prev => prev.map(updater));
 
-    const updater = (h: Habit) => {
-      if (h.id !== id) return h;
-
-      const isCompleting = !h.completed;
-      let newStreak = h.streak;
-
-      let newHistory = [...(h.history || [])];
-
-      if (isCompleting) {
-        newStreak = h.streak + 1;
-        if (!newHistory.includes(today)) {
-          newHistory.push(today);
-        }
-      } else {
-        newStreak = Math.max(0, h.streak - 1);
-        newHistory = newHistory.filter(date => date !== today);
-      }
-
-      return {
-        ...h,
-        completed: isCompleting,
-        streak: newStreak,
-        history: newHistory,
-        lastChecked: today
-      };
-    };
-
-    if (type === 'positive') {
-      const updated = positiveHabits.map(updater);
-      setPositiveHabits(updated);
-      saveToStorage(updated, badHabits);
-    } else {
-      const updated = badHabits.map(updater);
-      setBadHabits(updated);
-      saveToStorage(positiveHabits, updated);
-    }
+    await toggleHabit(id);
+    loadHabits(); // Re-fetch to get accurate streak
   };
 
-  const startEdit = (habit: Habit) => {
+  const startEdit = (habit: any) => {
     setEditingId(habit.id);
     setEditName(habit.name);
   };
 
-  const saveEdit = (id: string, type: 'positive' | 'bad') => {
+  const saveEdit = async (id: string) => {
     if (!editName.trim()) {
       setEditingId(null);
       return;
     }
-
-    if (type === 'positive') {
-      const updated = positiveHabits.map(h => h.id === id ? { ...h, name: editName.trim() } : h);
-      setPositiveHabits(updated);
-      saveToStorage(updated, badHabits);
-    } else {
-      const updated = badHabits.map(h => h.id === id ? { ...h, name: editName.trim() } : h);
-      setBadHabits(updated);
-      saveToStorage(positiveHabits, updated);
-    }
+    await updateHabitName(id, editName);
     setEditingId(null);
+    loadHabits();
   };
 
   const promptAction = (id: string, type: 'positive' | 'bad', action: 'delete' | 'archive') => {
     setItemToDelete({ id, type, action });
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!itemToDelete) return;
+    const { id, action } = itemToDelete;
 
-    const { id, type, action } = itemToDelete;
-
-    // Helper to process list
-    const processList = (list: Habit[]) => {
-      if (action === 'delete') {
-        return list.filter(h => h.id !== id);
-      } else {
-        // Archive
-        return list.map(h => h.id === id ? { ...h, status: 'archived' as const } : h);
-      }
-    };
-
-    if (type === 'positive') {
-      const updated = processList(positiveHabits);
-      setPositiveHabits(updated);
-      saveToStorage(updated, badHabits);
-    } else {
-      const updated = processList(badHabits);
-      setBadHabits(updated);
-      saveToStorage(positiveHabits, updated);
-    }
+    await updateHabitStatus(id, action === 'delete' ? 'deleted' : 'archived');
     setItemToDelete(null);
+    loadHabits();
   };
 
-  const restoreHabit = (id: string, type: 'positive' | 'bad') => {
-    const restorer = (h: Habit) => h.id === id ? { ...h, status: 'active' as const } : h;
-
-    if (type === 'positive') {
-      const updated = positiveHabits.map(restorer);
-      setPositiveHabits(updated);
-      saveToStorage(updated, badHabits);
-    } else {
-      const updated = badHabits.map(restorer);
-      setBadHabits(updated);
-      saveToStorage(positiveHabits, updated);
-    }
+  const restoreHabit = async (id: string) => {
+    await updateHabitStatus(id, 'active');
+    loadHabits();
   };
 
   // Filter Views
@@ -345,7 +262,7 @@ export default function HabitsSection() {
                         )
                       ) : (
                         <>
-                          <button onClick={() => restoreHabit(habit.id, 'positive')} className="p-1.5 text-[#86efac] hover:bg-[#86efac]/10 rounded-lg transition-colors flex items-center gap-1.5 text-[10px] font-bold px-2.5">
+                          <button onClick={() => restoreHabit(habit.id)} className="p-1.5 text-[#86efac] hover:bg-[#86efac]/10 rounded-lg transition-colors flex items-center gap-1.5 text-[10px] font-bold px-2.5">
                             <RotateCcw size={12} />
                           </button>
                           <button onClick={() => promptAction(habit.id, 'positive', 'delete')} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors">
@@ -378,10 +295,10 @@ export default function HabitsSection() {
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {activeTab === 'active' ? (
                         <button
-                          onClick={() => toggleHabit(habit.id, 'bad')}
+                          onClick={() => handleToggle(habit.id)}
                           className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 flex-shrink-0 border ${habit.completed
-                            ? 'bg-[#fca5a5] border-[#fca5a5] text-black shadow-[0_0_15px_rgba(252,165,165,0.3)]'
-                            : 'bg-[#1a1a1a] border-[#262626] text-gray-600 hover:border-[#fca5a5]/50'
+                            ? 'bg-[#86efac] border-[#86efac] text-black shadow-[0_0_15px_rgba(134,239,172,0.3)]'
+                            : 'bg-[#1a1a1a] border-[#262626] text-gray-600 hover:border-[#86efac]/50'
                             }`}
                         >
                           <Shield size={18} className={`transition-transform duration-300 ${habit.completed ? 'scale-110' : 'scale-100'}`} />

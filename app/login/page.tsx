@@ -55,7 +55,7 @@ export default function Login() {
     }
 
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center pb-24 p-4 relative overflow-hidden">
             {/* Background Ambience */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#7dd3fc]/5 rounded-full blur-3xl animate-pulse" />

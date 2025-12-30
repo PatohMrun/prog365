@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { User, LogOut } from "lucide-react";
 import { supabase } from "../utils/supabase";
+import { getHabits } from "../actions/habits";
+import { getProjects } from "../actions/projects";
 
 export default function ProfileSection() {
     const [stats, setStats] = useState({
@@ -14,26 +16,28 @@ export default function ProfileSection() {
     });
 
     useEffect(() => {
-        const savedPositive = JSON.parse(localStorage.getItem('positiveHabits') || '[]');
-        const savedBad = JSON.parse(localStorage.getItem('badHabits') || '[]');
-        const savedProjects = JSON.parse(localStorage.getItem('projects') || '[]');
+        const loadProfileStats = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user?.email) return;
 
-        // Calculate Best Streak
-        const allHabits = [...savedPositive, ...savedBad];
-        const bestStreak = allHabits.reduce((max: number, h: any) => Math.max(max, h.streak || 0), 0);
+            const { positive, negative } = await getHabits(session.user.email);
+            const projects = await getProjects(session.user.email);
 
-        // Calculate Today's Completion
-        const total = allHabits.length;
-        const completed = allHabits.filter((h: any) => h.completed).length;
-        const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+            const allHabits = [...positive, ...negative];
+            const bestStreak = allHabits.reduce((max: number, h: any) => Math.max(max, h.streak || 0), 0);
+            const total = allHabits.length;
+            const completed = allHabits.filter((h: any) => h.completed).length;
+            const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-        setStats({
-            positiveCount: savedPositive.length,
-            badCount: savedBad.length,
-            projectsCount: savedProjects.filter((p: any) => !p.status || p.status === 'active').length,
-            bestStreak: bestStreak,
-            todayCompletion: percent
-        });
+            setStats({
+                positiveCount: positive.length,
+                badCount: negative.length,
+                projectsCount: projects.filter((p: any) => !p.status || p.status === 'active').length,
+                bestStreak,
+                todayCompletion: percent
+            });
+        };
+        loadProfileStats();
     }, []);
 
     return (

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { BookOpen, RefreshCw, Calendar, X, ChevronRight } from "lucide-react";
-import { Storage, Reflection } from "../utils/storage";
+import { getReflections, createReflection } from "../actions/reflections";
+import { supabase } from "../utils/supabase";
 
 interface BibleVerse {
   text: string;
@@ -17,27 +18,31 @@ interface VerseSectionProps {
 
 export default function VerseSection({ verse, loading, onRefresh }: VerseSectionProps) {
   const [reflectionText, setReflectionText] = useState("");
-  const [reflections, setReflections] = useState<Reflection[]>([]);
-  const [selectedReflection, setSelectedReflection] = useState<Reflection | null>(null);
+  const [reflections, setReflections] = useState<any[]>([]);
+  const [selectedReflection, setSelectedReflection] = useState<any | null>(null);
 
   useEffect(() => {
-    setReflections(Storage.getReflections());
+    loadReflections();
   }, []);
 
-  const handleSave = () => {
+  const loadReflections = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.email) return;
+
+    const data = await getReflections(session.user.email);
+    setReflections(data);
+  };
+
+  const handleSave = async () => {
     if (!reflectionText.trim()) return;
 
-    const newReflection: Reflection = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString('en-CA'),
-      text: reflectionText.trim(),
-      verseReference: verse?.reference
-    };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.email) return;
 
-    const updated = [newReflection, ...reflections];
-    setReflections(updated);
-    Storage.saveReflections(updated);
+    await createReflection(session.user.email, reflectionText.trim(), verse?.reference || '');
+
     setReflectionText("");
+    loadReflections();
   };
 
   return (
@@ -66,7 +71,7 @@ export default function VerseSection({ verse, loading, onRefresh }: VerseSection
                 </p>
               )}
               <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">
-                {selectedReflection.text}
+                {selectedReflection.content}
               </p>
             </div>
           </div>
@@ -146,7 +151,7 @@ export default function VerseSection({ verse, loading, onRefresh }: VerseSection
                       </td>
                       <td className="py-3 pr-2 align-middle">
                         <p className="text-xs sm:text-sm text-gray-300 line-clamp-1 group-hover:text-white transition-colors">
-                          {ref.text}
+                          {ref.content}
                         </p>
                       </td>
                       <td className="py-3 pr-1 align-middle w-6 text-right">

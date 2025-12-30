@@ -1,0 +1,75 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  habits      Habit[]
+  projects    Project[]
+  reflections Reflection[]
+}
+
+model Habit {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   // "positive" | "negative"
+  streak    Int      @default(0)
+  status    String   @default("active") // "active" | "archived"
+  
+  // Storing completed dates as a simple array of strings "YYYY-MM-DD"
+  // Note: Prisma+Postgres supports String[], but SQLite doesn't. 
+  // Since we are migrating to Postgres, this is safe.
+  completedDates String[]
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+}
+
+model Project {
+  id            String   @id @default(uuid())
+  name          String
+  status        String   @default("active") // "active" | "completed" | "archived"
+  progress      Int      @default(0)
+  
+  startDate     DateTime
+  deadline      DateTime
+  completedDate DateTime? // If set, it's completed or archived
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+}
+
+model Reflection {
+  id             String   @id @default(uuid())
+  content        String
+  verseReference String
+  date           String   // "YYYY-MM-DD"
+
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, date]) // One reflection per day per user
+}
