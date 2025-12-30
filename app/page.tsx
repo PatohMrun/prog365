@@ -35,7 +35,21 @@ export default function Home() {
     const oldIndex = tabs.indexOf(activeTab);
     setDirection(newIndex > oldIndex ? 1 : -1);
     setActiveTab(newTab);
+
+    // Efficiently update URL without triggering navigation
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', newTab);
+    window.history.replaceState({}, '', url);
   };
+
+  useEffect(() => {
+    // Check URL on initial load to restore tab
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && tabs.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, []);
 
   const handleDragEnd = (e: any, { offset, velocity }: any) => {
     const swipeConfidenceThreshold = 200;
@@ -277,8 +291,9 @@ export default function Home() {
             opacity: { duration: 0.2 }
           }}
           drag="x"
+          dragDirectionLock
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={1}
+          dragElastic={0.2}
           onDragEnd={handleDragEnd}
           className="w-full h-full absolute top-0 left-0"
         >
