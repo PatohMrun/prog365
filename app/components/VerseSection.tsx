@@ -17,7 +17,7 @@ interface VerseSectionProps {
 export default function VerseSection({ verse, loading, onRefresh }: VerseSectionProps) {
 
   return (
-    <div className="min-h-screen bg-black text-white pb-20 px-4 pt-6">
+    <div className="min-h-screen bg-transparent text-white pb-20 px-4 pt-6">
       <div className="max-w-2xl mx-auto">
         <div className="glass-card rounded-2xl p-8 hover-lift animate-fade-in">
           <div className="flex items-center justify-between mb-6">

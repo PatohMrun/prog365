@@ -19,14 +19,14 @@ export default function HabitsSection() {
   useEffect(() => {
     const savedPositive = localStorage.getItem('positiveHabits');
     const savedBad = localStorage.getItem('badHabits');
-    
+
     if (savedPositive) setPositiveHabits(JSON.parse(savedPositive));
     if (savedBad) setBadHabits(JSON.parse(savedBad));
   }, []);
 
   const addHabit = (type: 'positive' | 'bad') => {
     if (!newHabitName.trim()) return;
-    
+
     const newHabit: Habit = {
       id: Date.now().toString(),
       name: newHabitName.trim(),
@@ -43,7 +43,7 @@ export default function HabitsSection() {
       setBadHabits(updated);
       localStorage.setItem('badHabits', JSON.stringify(updated));
     }
-    
+
     setNewHabitName('');
     setShowAddHabit(null);
   };
@@ -62,13 +62,13 @@ export default function HabitsSection() {
 
   const toggleHabit = (id: string, type: 'positive' | 'bad') => {
     if (type === 'positive') {
-      const updated = positiveHabits.map(h => 
+      const updated = positiveHabits.map(h =>
         h.id === id ? { ...h, completed: !h.completed } : h
       );
       setPositiveHabits(updated);
       localStorage.setItem('positiveHabits', JSON.stringify(updated));
     } else {
-      const updated = badHabits.map(h => 
+      const updated = badHabits.map(h =>
         h.id === id ? { ...h, completed: !h.completed } : h
       );
       setBadHabits(updated);
@@ -77,7 +77,7 @@ export default function HabitsSection() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-20 px-4 pt-6">
+    <div className="min-h-screen bg-transparent text-white pb-20 px-4 pt-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center space-x-3 mb-8">
           <Target className="text-[#7dd3fc]" size={28} />
@@ -92,14 +92,14 @@ export default function HabitsSection() {
                 <CheckCircle className="text-[#86efac]" size={24} />
                 <h2 className="text-xl font-semibold text-[#86efac]">Build Habits</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setShowAddHabit('positive')}
                 className="text-[#7dd3fc] hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1a1a1a]"
               >
                 <Plus size={20} />
               </button>
             </div>
-            
+
             {showAddHabit === 'positive' && (
               <div className="mb-4 p-4 rounded-xl gradient-bg">
                 <input
@@ -127,7 +127,7 @@ export default function HabitsSection() {
                 </div>
               </div>
             )}
-            
+
             <div className="space-y-3">
               {positiveHabits.map(habit => (
                 <div key={habit.id} className="group">
@@ -135,16 +135,14 @@ export default function HabitsSection() {
                     <div className="flex items-center space-x-4 flex-1">
                       <button
                         onClick={() => toggleHabit(habit.id, 'positive')}
-                        className={`w-6 h-6 rounded-full border-2 transition-all flex-shrink-0 ${
-                          habit.completed 
-                            ? 'bg-[#86efac] border-[#86efac] shadow-lg shadow-[#86efac]/30' 
+                        className={`w-6 h-6 rounded-full border-2 transition-all flex-shrink-0 ${habit.completed
+                            ? 'bg-[#86efac] border-[#86efac] shadow-lg shadow-[#86efac]/30'
                             : 'border-[#666] hover:border-[#86efac]'
-                        }`}
+                          }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <span className={`font-medium break-words ${
-                          habit.completed ? 'line-through text-gray-500' : ''
-                        }`}>
+                        <span className={`font-medium break-words ${habit.completed ? 'line-through text-gray-500' : ''
+                          }`}>
                           {habit.name}
                         </span>
                         <div className="text-xs text-gray-400 mt-1">
@@ -174,14 +172,14 @@ export default function HabitsSection() {
                 <XCircle className="text-[#fca5a5]" size={24} />
                 <h2 className="text-xl font-semibold text-[#fca5a5]">Avoid Today</h2>
               </div>
-              <button 
+              <button
                 onClick={() => setShowAddHabit('bad')}
                 className="text-[#7dd3fc] hover:text-white transition-colors p-2 rounded-lg hover:bg-[#1a1a1a]"
               >
                 <Plus size={20} />
               </button>
             </div>
-            
+
             {showAddHabit === 'bad' && (
               <div className="mb-4 p-4 rounded-xl gradient-bg">
                 <input
@@ -209,7 +207,7 @@ export default function HabitsSection() {
                 </div>
               </div>
             )}
-            
+
             <div className="space-y-3">
               {badHabits.map(habit => (
                 <div key={habit.id} className="group">
@@ -217,16 +215,14 @@ export default function HabitsSection() {
                     <div className="flex items-center space-x-4 flex-1">
                       <button
                         onClick={() => toggleHabit(habit.id, 'bad')}
-                        className={`w-6 h-6 rounded-full border-2 transition-all flex-shrink-0 ${
-                          habit.completed 
-                            ? 'bg-[#fca5a5] border-[#fca5a5] shadow-lg shadow-[#fca5a5]/30' 
+                        className={`w-6 h-6 rounded-full border-2 transition-all flex-shrink-0 ${habit.completed
+                            ? 'bg-[#fca5a5] border-[#fca5a5] shadow-lg shadow-[#fca5a5]/30'
                             : 'border-[#666] hover:border-[#fca5a5]'
-                        }`}
+                          }`}
                       />
                       <div className="flex-1 min-w-0">
-                        <span className={`font-medium break-words ${
-                          habit.completed ? 'line-through text-gray-500' : ''
-                        }`}>
+                        <span className={`font-medium break-words ${habit.completed ? 'line-through text-gray-500' : ''
+                          }`}>
                           {habit.name}
                         </span>
                         <div className="text-xs text-gray-400 mt-1">

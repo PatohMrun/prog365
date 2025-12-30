@@ -25,7 +25,7 @@ export default function ProfileSection() {
     }, []);
 
     return (
-        <div className="min-h-screen bg-black text-white pb-20 px-4 pt-6">
+        <div className="min-h-screen bg-transparent text-white pb-20 px-4 pt-6">
             <div className="max-w-2xl mx-auto">
                 <div className="flex items-center space-x-3 mb-8">
                     <User className="text-[#7dd3fc]" size={28} />

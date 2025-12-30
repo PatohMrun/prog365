@@ -193,7 +193,7 @@ export default function Home() {
   };
 
   const Dashboard = () => (
-    <div className="min-h-screen bg-black text-white pb-24 px-4 pt-6">
+    <div className="min-h-screen bg-transparent text-white pb-24 px-4 pt-6">
       <header className="flex justify-between items-start mb-8">
         <div>
           <p className="text-gray-400 text-sm font-medium mb-1">{today}</p>
@@ -310,7 +310,7 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
+    <div className="min-h-screen bg-transparent text-white overflow-hidden relative">
       <AnimatePresence initial={false} custom={direction}>
         <motion.div
           key={activeTab}
