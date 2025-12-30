@@ -49,6 +49,19 @@ export default function Home() {
     if (tabParam && tabs.includes(tabParam)) {
       setActiveTab(tabParam);
     }
+
+    // Handle online reconnection
+    const handleOnline = () => {
+      // Only refetch if we don't have today's verse
+      const today = new Date().toDateString();
+      const cachedDate = localStorage.getItem('verseDate');
+      if (cachedDate !== today) {
+        fetchVerse(true);
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
   }, []);
 
   const handleDragEnd = (e: any, { offset, velocity }: any) => {
@@ -115,22 +128,42 @@ export default function Home() {
     });
   };
 
-  const fetchVerse = async () => {
+  const fetchVerse = async (forceRefetch = false) => {
+    const today = new Date().toDateString();
+    const cachedDate = localStorage.getItem('verseDate');
+    const cachedVerse = localStorage.getItem('cachedVerse');
+
+    if (!forceRefetch && cachedDate === today && cachedVerse) {
+      setVerse(JSON.parse(cachedVerse));
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await fetch('https://labs.bible.org/api/?passage=votd&type=json');
       const data = await response.json();
       if (data && data[0]) {
-        setVerse({
+        const newVerse = {
           text: data[0].text,
           reference: `${data[0].bookname} ${data[0].chapter}:${data[0].verse}`
-        });
+        };
+        setVerse(newVerse);
+        localStorage.setItem('cachedVerse', JSON.stringify(newVerse));
+        localStorage.setItem('verseDate', today);
       }
     } catch (error) {
-      setVerse({
-        text: "Trust in the Lord with all your heart...",
-        reference: "Proverbs 3:5-6"
-      });
+      console.error("Error fetching verse:", error);
+      // Offline Strategy: If fetch fails, try to show the last cached verse (even if old)
+      if (cachedVerse) {
+        setVerse(JSON.parse(cachedVerse));
+      } else {
+        // Fallback only if no cache exists at all
+        setVerse({
+          text: "Trust in the Lord with all your heart...",
+          reference: "Proverbs 3:5-6"
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -151,7 +184,7 @@ export default function Home() {
 
   const TabContent = () => {
     switch (activeTab) {
-      case 'verse': return <VerseSection />;
+      case 'verse': return <VerseSection verse={verse} loading={loading} onRefresh={() => fetchVerse(true)} />;
       case 'habits': return <HabitsSection />;
       case 'projects': return <ProjectsSection />;
       case 'profile': return <ProfileSection />;
