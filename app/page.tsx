@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { BookOpen, CheckCircle, XCircle, Calendar, Target, Plus, ArrowRight, TrendingUp, AlertCircle, Shield, Flame, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BottomNav from "./components/BottomNav";
@@ -31,18 +31,54 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
   const [direction, setDirection] = useState(0);
   const [verse, setVerse] = useState<BibleVerse | null>(null);
-  const [stats, setStats] = useState<SummaryStats>({
-    positiveTotal: 0,
-    positiveCompleted: 0,
-    badTotal: 0,
-    badClean: 0,
-    projectsTotal: 0,
-    projectsBehind: 0
-  });
+
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [habitsData, setHabitsData] = useState<{ positive: any[], negative: any[] }>({ positive: [], negative: [] });
   const [projects, setProjects] = useState<any[]>([]);
+
+  // Derived Stats instead of separate state
+  const stats = useMemo(() => {
+    const { positive, negative } = habitsData;
+
+    // Calculate Habits Stats
+    const posCompleted = positive.filter((h: any) => h.completed).length;
+    const badClean = negative.filter((h: any) => h.completed).length;
+
+    // Filter for Active Projects Only
+    const activeProjects = projects.filter((p: any) => !p.status || p.status === 'active');
+
+    // Calculate Project status
+    let behindCount = 0;
+    activeProjects.forEach((p: any) => {
+      const start = new Date(p.startDate).getTime();
+      const end = new Date(p.deadline).getTime();
+      const now = Date.now();
+
+      // Check Overdue
+      const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+      if (daysLeft < 0) {
+        behindCount++;
+        return;
+      }
+
+      // Check Pacing
+      if (end > start) {
+        const timePercent = ((now - start) / (end - start)) * 100;
+        // If Work Progress < Time Elapsed - 10%, it's behind
+        if (p.progress < Math.min(100, Math.max(0, timePercent)) - 10) behindCount++;
+      }
+    });
+
+    return {
+      positiveTotal: positive.length,
+      positiveCompleted: posCompleted,
+      badTotal: negative.length,
+      badClean,
+      projectsTotal: activeProjects.length,
+      projectsBehind: behindCount,
+    };
+  }, [habitsData, projects]);
 
   const tabs = ['home', 'verse', 'habits', 'projects', 'profile'];
 
@@ -96,44 +132,6 @@ export default function Home() {
 
     setHabitsData({ positive, negative });
     setProjects(projectsData);
-
-    const posCompleted = positive.filter((h: any) => h.completed).length;
-
-    // Filter for Active Projects Only
-    const activeProjects = projectsData.filter((p: any) => !p.status || p.status === 'active');
-
-    // Calculate Project status
-    let behindCount = 0;
-    activeProjects.forEach((p: any) => {
-      const start = new Date(p.startDate).getTime();
-      const end = new Date(p.deadline).getTime();
-      const now = Date.now();
-
-      // Check Overdue
-      const daysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-      if (daysLeft < 0) {
-        behindCount++;
-        return;
-      }
-
-      // Check Pacing
-      if (end > start) {
-        const timePercent = ((now - start) / (end - start)) * 100;
-        // If Work Progress < Time Elapsed - 10%, it's behind
-        if (p.progress < Math.min(100, Math.max(0, timePercent)) - 10) behindCount++;
-      }
-    });
-
-    const allHabits = [...positive, ...negative];
-
-    setStats({
-      positiveTotal: positive.length,
-      positiveCompleted: posCompleted,
-      badTotal: negative.length,
-      badClean: negative.filter((h: any) => h.completed).length,
-      projectsTotal: activeProjects.length,
-      projectsBehind: behindCount,
-    });
   };
 
   const refreshData = async () => {

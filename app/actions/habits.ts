@@ -44,7 +44,7 @@ export async function getHabits(email: string) {
 export async function createHabit(email: string, name: string, type: 'positive' | 'negative') {
     if (!email || !name) return { error: "Missing data" };
     try {
-        await prisma.habit.create({
+        const habit = await prisma.habit.create({
             data: {
                 name,
                 type,
@@ -53,7 +53,7 @@ export async function createHabit(email: string, name: string, type: 'positive' 
             }
         });
         revalidatePath('/');
-        return { success: true };
+        return { success: true, habit: { ...habit, completed: false } };
     } catch (error) {
         console.error('createHabit error:', error);
         return { error: 'Failed' };
@@ -65,53 +65,55 @@ export async function toggleHabit(id: string) {
     const today = getToday();
 
     try {
-        const habit = await prisma.habit.findUnique({ where: { id } });
-        if (!habit) throw new Error("Not found");
+        const result = await prisma.$transaction(async (tx: any) => {
+            const habit = await tx.habit.findUnique({ where: { id } });
+            if (!habit) throw new Error("Not found");
 
-        const isCompletedToday = habit.completedDates.includes(today);
-        let newHistory = isCompletedToday
-            ? habit.completedDates.filter((d: string) => d !== today)
-            : [...habit.completedDates, today];
+            const isCompletedToday = habit.completedDates.includes(today);
+            let newHistory = isCompletedToday
+                ? habit.completedDates.filter((d: string) => d !== today)
+                : [...habit.completedDates, today];
 
-        // Streak Calculation
-        // Simplified: Count consecutive days backwards from yesterday (if completed today) OR today
-        // But for minimal complexity, we just increment/decrement streak based on action for now, OR recalculate fully.
-        // Full recalculation is safer.
-        let streak = 0;
-        // ... (We can implement robust streak calc later, for now we mirror the simple logic)
-
-        if (!isCompletedToday) {
-            // completing
-            streak = habit.streak + 1;
-        } else {
-            // uncompleting
-            streak = Math.max(0, habit.streak - 1);
-        }
-
-        await prisma.habit.update({
-            where: { id },
-            data: {
-                completedDates: newHistory,
-                streak
+            // Streak Calculation
+            let streak = habit.streak;
+            if (!isCompletedToday) {
+                streak = habit.streak + 1;
+            } else {
+                streak = Math.max(0, habit.streak - 1);
             }
+
+            const updatedHabit = await tx.habit.update({
+                where: { id },
+                data: {
+                    completedDates: newHistory,
+                    streak
+                }
+            });
+
+            return updatedHabit;
         });
+
         revalidatePath('/');
-        return { success: true };
+        return {
+            success: true,
+            habit: { ...result, completed: result.completedDates.includes(today) }
+        };
     } catch (error) {
+        console.error('toggleHabit error:', error);
         return { error: 'Failed' };
     }
 }
 
 // EDIT (Rename)
 export async function updateHabitName(id: string, name: string) {
-    if (!name.trim()) return;
+    if (!name.trim()) return { error: "Name required" };
     try {
-        await prisma.habit.update({
+        const habit = await prisma.habit.update({
             where: { id },
             data: { name }
         });
         revalidatePath('/');
-        return { success: true };
+        return { success: true, habit };
     } catch (error) {
         return { error: 'Failed' };
     }

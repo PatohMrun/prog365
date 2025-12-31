@@ -26,7 +26,7 @@ export async function createProject(email: string, name: string, startDate: stri
     if (!email || !name || !startDate || !deadline) return { error: "Missing data" };
 
     try {
-        await prisma.project.create({
+        const project = await prisma.project.create({
             data: {
                 name,
                 startDate: new Date(startDate),
@@ -37,7 +37,7 @@ export async function createProject(email: string, name: string, startDate: stri
             }
         });
         revalidatePath('/');
-        return { success: true };
+        return { success: true, project };
     } catch (error) {
         console.error('createProject error:', error);
         return { error: 'Failed' };
@@ -52,12 +52,12 @@ export async function updateProject(id: string, data: { name?: string, progress?
             updateData.deadline = new Date(data.deadline);
         }
 
-        await prisma.project.update({
+        const project = await prisma.project.update({
             where: { id },
             data: updateData
         });
         revalidatePath('/');
-        return { success: true };
+        return { success: true, project };
     } catch (error) {
         return { error: 'Failed' };
     }
@@ -78,10 +78,12 @@ export async function updateProjectStatus(id: string, status: 'active' | 'comple
                 data.completedDate = null;
             }
 
-            await prisma.project.update({
+            const project = await prisma.project.update({
                 where: { id },
                 data
             });
+            revalidatePath('/');
+            return { success: true, project };
         }
         revalidatePath('/');
         return { success: true };

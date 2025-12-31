@@ -39,12 +39,15 @@ export default function ProjectsSection({ projects, setProjects, onUpdate }: Pro
         deadlineDate.setDate(deadlineDate.getDate() + 30);
         const defaultDeadline = deadlineDate.toLocaleDateString('en-CA');
 
-        await createProject(session.user.email, newProjectName.trim(), today, newProjectDeadline || defaultDeadline);
+        const result = await createProject(session.user.email, newProjectName.trim(), today, newProjectDeadline || defaultDeadline);
+
+        if (result.success && result.project) {
+            setProjects(prev => [result.project, ...prev]);
+        }
 
         setNewProjectName('');
         setNewProjectDeadline('');
         setShowAddProject(false);
-        onUpdate();
     };
 
     const promptDelete = (id: string) => {
@@ -54,9 +57,11 @@ export default function ProjectsSection({ projects, setProjects, onUpdate }: Pro
     const confirmDelete = async () => {
         if (!projectToDelete) return;
 
-        await updateProjectStatus(projectToDelete, 'deleted');
+        const result = await updateProjectStatus(projectToDelete, 'deleted');
+        if (result.success) {
+            setProjects(prev => prev.filter(p => p.id !== projectToDelete));
+        }
         setProjectToDelete(null);
-        onUpdate();
     };
 
     const startEdit = (project: any) => {
@@ -73,13 +78,16 @@ export default function ProjectsSection({ projects, setProjects, onUpdate }: Pro
             return;
         }
 
-        await updateProject(editingId, {
+        const result = await updateProject(editingId, {
             name: editName.trim(),
             deadline: editDeadline
         });
 
+        if (result.success && result.project) {
+            setProjects(prev => prev.map(p => p.id === editingId ? result.project : p));
+        }
+
         setEditingId(null);
-        onUpdate();
     };
 
     const updateProgress = async (id: string, delta: number) => {
@@ -88,16 +96,22 @@ export default function ProjectsSection({ projects, setProjects, onUpdate }: Pro
 
         const newProgress = Math.max(0, Math.min(100, project.progress + delta));
 
-        // Optimistic UI
+        // Optimistic UI (Fast)
         setProjects(prev => prev.map(p => p.id === id ? { ...p, progress: newProgress } : p));
 
-        await updateProject(id, { progress: newProgress });
-        onUpdate(); // Sync/Revalidate
+        const result = await updateProject(id, { progress: newProgress });
+
+        // Authoritative confirmation
+        if (result.success && result.project) {
+            setProjects(prev => prev.map(p => p.id === id ? result.project : p));
+        }
     };
 
     const completeProject = async (project: any) => {
-        await updateProjectStatus(project.id, 'completed');
-        onUpdate();
+        const result = await updateProjectStatus(project.id, 'completed');
+        if (result.success && result.project) {
+            setProjects(prev => prev.map(p => p.id === project.id ? result.project : p));
+        }
     };
 
     // Calculate Pacing Logic

@@ -31,9 +31,14 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.email) return;
 
-    await createHabit(session.user.email, newHabitName.trim(), type === 'positive' ? 'positive' : 'negative');
+    const result = await createHabit(session.user.email, newHabitName.trim(), type === 'positive' ? 'positive' : 'negative');
+    if (result.success && result.habit) {
+      setHabitsData(prev => ({
+        ...prev,
+        [type === 'positive' ? 'positive' : 'negative']: [...prev[type === 'positive' ? 'positive' : 'negative'], result.habit]
+      }));
+    }
     setNewHabitName('');
-    onUpdate();
   };
 
   const handleToggle = async (id: string, type: 'positive' | 'negative' = 'positive') => {
@@ -46,8 +51,15 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
       negative: type === 'negative' ? prev.negative.map(updater) : prev.negative
     }));
 
-    await toggleHabit(id);
-    onUpdate();
+    const result = await toggleHabit(id);
+    if (result.success && result.habit) {
+      // Authoritative update from server (fixes streak consistency)
+      setHabitsData(prev => ({
+        ...prev,
+        positive: type === 'positive' ? prev.positive.map(h => h.id === id ? result.habit : h) : prev.positive,
+        negative: type === 'negative' ? prev.negative.map(h => h.id === id ? result.habit : h) : prev.negative
+      }));
+    }
   };
 
   const startEdit = (habit: any) => {
@@ -60,9 +72,15 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
       setEditingId(null);
       return;
     }
-    await updateHabitName(id, editName);
+    const result = await updateHabitName(id, editName);
+    if (result.success && result.habit) {
+      setHabitsData(prev => ({
+        ...prev,
+        positive: type === 'positive' ? prev.positive.map(h => h.id === id ? result.habit : h) : prev.positive,
+        negative: type === 'bad' ? prev.negative.map(h => h.id === id ? result.habit : h) : prev.negative
+      }));
+    }
     setEditingId(null);
-    onUpdate();
   };
 
   const promptAction = (id: string, type: 'positive' | 'bad', action: 'delete' | 'archive') => {
@@ -73,14 +91,28 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
     if (!itemToDelete) return;
     const { id, action } = itemToDelete;
 
-    await updateHabitStatus(id, action === 'delete' ? 'deleted' : 'archived');
+    const success = await updateHabitStatus(id, action === 'delete' ? 'deleted' : 'archived');
+    if (success) {
+      setHabitsData(prev => {
+        // Helper to remove or update status
+        const updater = (list: any[]) => list.map(h => h.id === id ? { ...h, status: action === 'delete' ? 'deleted' : 'archived' } : h).filter(h => h.status !== 'deleted');
+        return {
+          positive: updater(prev.positive),
+          negative: updater(prev.negative)
+        };
+      });
+    }
     setItemToDelete(null);
-    onUpdate();
   };
 
   const restoreHabit = async (id: string) => {
-    await updateHabitStatus(id, 'active');
-    onUpdate();
+    const success = await updateHabitStatus(id, 'active');
+    if (success) {
+      setHabitsData(prev => ({
+        positive: prev.positive.map(h => h.id === id ? { ...h, status: 'active' } : h),
+        negative: prev.negative.map(h => h.id === id ? { ...h, status: 'active' } : h)
+      }));
+    }
   };
 
   // Filter Views
