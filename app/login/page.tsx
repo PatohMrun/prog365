@@ -18,7 +18,7 @@ export default function Login() {
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
-                emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined,
+                emailRedirectTo: process.env.NEXT_PUBLIC_APP_URL || 'https://prod365.vercel.app',
             },
         });
 
