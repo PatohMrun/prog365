@@ -41,6 +41,8 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [habitsData, setHabitsData] = useState<{ positive: any[], negative: any[] }>({ positive: [], negative: [] });
+  const [projects, setProjects] = useState<any[]>([]);
 
   const tabs = ['home', 'verse', 'habits', 'projects', 'profile'];
 
@@ -90,12 +92,15 @@ export default function Home() {
     if (typeof window === 'undefined') return;
 
     const { positive, negative } = await getHabits(email);
-    const projects = await getProjects(email);
+    const projectsData = await getProjects(email);
+
+    setHabitsData({ positive, negative });
+    setProjects(projectsData);
 
     const posCompleted = positive.filter((h: any) => h.completed).length;
 
     // Filter for Active Projects Only
-    const activeProjects = projects.filter((p: any) => !p.status || p.status === 'active');
+    const activeProjects = projectsData.filter((p: any) => !p.status || p.status === 'active');
 
     // Calculate Project status
     let behindCount = 0;
@@ -129,6 +134,12 @@ export default function Home() {
       projectsTotal: activeProjects.length,
       projectsBehind: behindCount,
     });
+  };
+
+  const refreshData = async () => {
+    if (user?.email) {
+      await loadStats(user.email);
+    }
   };
 
   const fetchVerse = async (forceRefetch = false) => {
@@ -190,49 +201,25 @@ export default function Home() {
       loadStats(session.user.email!);
     };
     checkSession();
-
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    if (tabParam && tabs.includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
-
-    const handleRevalidation = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) loadStats(session.user.email);
-
-      const today = new Date().toLocaleDateString('en-CA');
-      const cachedDate = localStorage.getItem('verseDate_local');
-      if (cachedDate !== today) {
-        fetchVerse(true);
-      }
-    };
-
-    window.addEventListener('online', handleRevalidation);
-    return () => {
-      window.removeEventListener('online', handleRevalidation);
-    };
   }, []);
 
   useEffect(() => {
     fetchVerse();
   }, []);
 
-  useEffect(() => {
-    const sync = async () => {
-      if (activeTab === 'home' || activeTab === 'profile') {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.email) loadStats(session.user.email);
-      }
-    };
-    sync();
-  }, [activeTab]);
-
   const renderTabContent = () => {
     switch (activeTab) {
       case 'verse': return <VerseSection verse={verse} loading={loading} onRefresh={() => fetchVerse(true)} />;
-      case 'habits': return <HabitsSection />;
-      case 'projects': return <ProjectsSection />;
+      case 'habits': return <HabitsSection
+        habitsData={habitsData}
+        setHabitsData={setHabitsData}
+        onUpdate={refreshData}
+      />;
+      case 'projects': return <ProjectsSection
+        projects={projects}
+        setProjects={setProjects}
+        onUpdate={refreshData}
+      />;
       case 'profile': return <ProfileSection initialUser={user} />;
       default: return renderDashboard();
     }

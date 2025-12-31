@@ -5,9 +5,14 @@ import { Plus, Check, Trash2, Edit2, Shield, Flame, Archive, RotateCcw, X, Alert
 import { getHabits, createHabit, toggleHabit, updateHabitName, updateHabitStatus } from "../actions/habits";
 import { supabase } from "../utils/supabase";
 
-export default function HabitsSection() {
-  const [positiveHabits, setPositiveHabits] = useState<any[]>([]);
-  const [badHabits, setBadHabits] = useState<any[]>([]);
+interface HabitsSectionProps {
+  habitsData: { positive: any[], negative: any[] };
+  setHabitsData: React.Dispatch<React.SetStateAction<{ positive: any[], negative: any[] }>>;
+  onUpdate: () => Promise<void>;
+}
+
+export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: HabitsSectionProps) {
+  const { positive: positiveHabits, negative: badHabits } = habitsData;
   const [newHabitName, setNewHabitName] = useState('');
 
   // Tab State
@@ -20,19 +25,6 @@ export default function HabitsSection() {
   // Delete/Archive Confirmation State
   const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'positive' | 'bad', action: 'delete' | 'archive' } | null>(null);
 
-  useEffect(() => {
-    loadHabits();
-  }, []);
-
-  const loadHabits = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user?.email) return;
-
-    const { positive, negative } = await getHabits(session.user.email);
-    setPositiveHabits(positive);
-    setBadHabits(negative);
-  };
-
   const addHabit = async (type: 'positive' | 'bad') => {
     if (!newHabitName.trim()) return;
 
@@ -41,17 +33,21 @@ export default function HabitsSection() {
 
     await createHabit(session.user.email, newHabitName.trim(), type === 'positive' ? 'positive' : 'negative');
     setNewHabitName('');
-    loadHabits(); // Refresh data
+    onUpdate();
   };
 
-  const handleToggle = async (id: string) => {
+  const handleToggle = async (id: string, type: 'positive' | 'negative' = 'positive') => {
     // Optimistic Update
     const updater = (h: any) => h.id === id ? { ...h, completed: !h.completed } : h;
-    setPositiveHabits(prev => prev.map(updater));
-    setBadHabits(prev => prev.map(updater));
+
+    setHabitsData(prev => ({
+      ...prev,
+      positive: type === 'positive' ? prev.positive.map(updater) : prev.positive,
+      negative: type === 'negative' ? prev.negative.map(updater) : prev.negative
+    }));
 
     await toggleHabit(id);
-    loadHabits(); // Re-fetch to get accurate streak
+    onUpdate();
   };
 
   const startEdit = (habit: any) => {
@@ -59,14 +55,14 @@ export default function HabitsSection() {
     setEditName(habit.name);
   };
 
-  const saveEdit = async (id: string) => {
+  const saveEdit = async (id: string, type: 'positive' | 'bad') => {
     if (!editName.trim()) {
       setEditingId(null);
       return;
     }
     await updateHabitName(id, editName);
     setEditingId(null);
-    loadHabits();
+    onUpdate();
   };
 
   const promptAction = (id: string, type: 'positive' | 'bad', action: 'delete' | 'archive') => {
@@ -79,12 +75,12 @@ export default function HabitsSection() {
 
     await updateHabitStatus(id, action === 'delete' ? 'deleted' : 'archived');
     setItemToDelete(null);
-    loadHabits();
+    onUpdate();
   };
 
   const restoreHabit = async (id: string) => {
     await updateHabitStatus(id, 'active');
-    loadHabits();
+    onUpdate();
   };
 
   // Filter Views

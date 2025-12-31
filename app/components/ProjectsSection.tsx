@@ -5,8 +5,13 @@ import { BarChart3, Plus, Trash2, Calendar, TrendingUp, AlertCircle, CheckCircle
 import { getProjects, createProject, updateProject, updateProjectStatus } from "../actions/projects";
 import { supabase } from "../utils/supabase";
 
-export default function ProjectsSection() {
-    const [projects, setProjects] = useState<any[]>([]);
+interface ProjectsSectionProps {
+    projects: any[];
+    setProjects: React.Dispatch<React.SetStateAction<any[]>>;
+    onUpdate: () => Promise<void>;
+}
+
+export default function ProjectsSection({ projects, setProjects, onUpdate }: ProjectsSectionProps) {
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
     // Create Flow
@@ -21,18 +26,6 @@ export default function ProjectsSection() {
 
     // Delete Confirmation State
     const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
-
-    useEffect(() => {
-        loadProjects();
-    }, []);
-
-    const loadProjects = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user?.email) return;
-
-        const data = await getProjects(session.user.email);
-        setProjects(data);
-    };
 
     const addProject = async () => {
         if (!newProjectName.trim()) return;
@@ -51,7 +44,7 @@ export default function ProjectsSection() {
         setNewProjectName('');
         setNewProjectDeadline('');
         setShowAddProject(false);
-        loadProjects();
+        onUpdate();
     };
 
     const promptDelete = (id: string) => {
@@ -63,7 +56,7 @@ export default function ProjectsSection() {
 
         await updateProjectStatus(projectToDelete, 'deleted');
         setProjectToDelete(null);
-        loadProjects();
+        onUpdate();
     };
 
     const startEdit = (project: any) => {
@@ -86,7 +79,7 @@ export default function ProjectsSection() {
         });
 
         setEditingId(null);
-        loadProjects();
+        onUpdate();
     };
 
     const updateProgress = async (id: string, delta: number) => {
@@ -99,12 +92,12 @@ export default function ProjectsSection() {
         setProjects(prev => prev.map(p => p.id === id ? { ...p, progress: newProgress } : p));
 
         await updateProject(id, { progress: newProgress });
-        loadProjects(); // Sync/Revalidate
+        onUpdate(); // Sync/Revalidate
     };
 
     const completeProject = async (project: any) => {
         await updateProjectStatus(project.id, 'completed');
-        loadProjects();
+        onUpdate();
     };
 
     // Calculate Pacing Logic
