@@ -201,7 +201,7 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {activeTab === 'active' ? (
                         <button
-                          onClick={() => toggleHabit(habit.id, 'positive')}
+                          onClick={() => handleToggle(habit.id, 'positive')}
                           className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 flex-shrink-0 border ${habit.completed
                             ? 'bg-[#86efac] border-[#86efac] text-black shadow-[0_0_15px_rgba(134,239,172,0.3)]'
                             : 'bg-[#1a1a1a] border-[#262626] text-gray-600 hover:border-[#86efac]/50'
@@ -348,7 +348,7 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
                         )
                       ) : (
                         <>
-                          <button onClick={() => restoreHabit(habit.id, 'bad')} className="p-1.5 text-[#86efac] hover:bg-[#86efac]/10 rounded-lg transition-colors flex items-center gap-1.5 text-[10px] font-bold px-2.5">
+                          <button onClick={() => restoreHabit(habit.id)} className="p-1.5 text-[#86efac] hover:bg-[#86efac]/10 rounded-lg transition-colors flex items-center gap-1.5 text-[10px] font-bold px-2.5">
                             <RotateCcw size={12} />
                           </button>
                           <button onClick={() => promptAction(habit.id, 'bad', 'delete')} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors">

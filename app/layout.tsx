@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MRun365 - Daily Growth Tracker",
+  title: "Prod365 - Daily Growth Tracker",
   description: "Track your daily growth, habits, and projects",
 };
 
