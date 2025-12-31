@@ -13,7 +13,19 @@ import { getUserProfile } from "./actions/user";
 import { getHabits } from "./actions/habits";
 import { getProjects } from "./actions/projects";
 
-// ... interfaces ...
+interface BibleVerse {
+  text: string;
+  reference: string;
+}
+
+interface SummaryStats {
+  positiveTotal: number;
+  positiveCompleted: number;
+  badTotal: number;
+  badClean: number;
+  projectsTotal: number;
+  projectsBehind: number;
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('home');
@@ -28,6 +40,7 @@ export default function Home() {
     projectsBehind: 0
   });
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   const tabs = ['home', 'verse', 'habits', 'projects', 'profile'];
 
@@ -37,20 +50,6 @@ export default function Home() {
     const oldIdx = tabs.indexOf(activeTab);
     setDirection(newIdx > oldIdx ? 1 : -1);
     setActiveTab(newTab);
-  };
-
-  const handleDragEnd = (e: any, { offset, velocity }: any) => {
-    const swipe = Math.abs(offset.x) * velocity.x;
-
-    if (swipe < -10000) {
-      // swiped right (next)
-      const currentIndex = tabs.indexOf(activeTab);
-      if (currentIndex < tabs.length - 1) handleTabChange(tabs[currentIndex + 1]);
-    } else if (swipe > 10000) {
-      // swiped left (prev)
-      const currentIndex = tabs.indexOf(activeTab);
-      if (currentIndex > 0) handleTabChange(tabs[currentIndex - 1]);
-    }
   };
 
   const variants = {
@@ -73,74 +72,19 @@ export default function Home() {
     })
   };
 
-  useEffect(() => {
-    // ... checkSession ...
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = '/login';
-        return;
-      }
+  const handleDragEnd = (e: any, { offset, velocity }: any) => {
+    const swipe = Math.abs(offset.x) * velocity.x;
 
-      // Check for Profile (Onboarding)
-      const userProfile = await getUserProfile(session.user.email!);
-      if (!userProfile || !userProfile.name) {
-        window.location.href = '/onboarding';
-      }
-
-      // Load Stats after auth confirmed
-      loadStats(session.user.email!);
-    };
-    checkSession();
-
-    // ... url check ...
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    if (tabParam && tabs.includes(tabParam)) {
-      setActiveTab(tabParam);
+    if (swipe < -10000) {
+      // swiped right (next)
+      const currentIndex = tabs.indexOf(activeTab);
+      if (currentIndex < tabs.length - 1) handleTabChange(tabs[currentIndex + 1]);
+    } else if (swipe > 10000) {
+      // swiped left (prev)
+      const currentIndex = tabs.indexOf(activeTab);
+      if (currentIndex > 0) handleTabChange(tabs[currentIndex - 1]);
     }
-
-    // Handle online reconnection & Visibility Change
-    const handleRevalidation = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) loadStats(session.user.email);
-
-      // 2. Check if we need new Verse
-      const today = new Date().toLocaleDateString('en-CA');
-      const cachedDate = localStorage.getItem('verseDate_local');
-      if (cachedDate !== today) {
-        fetchVerse(true);
-      }
-    };
-
-    window.addEventListener('online', handleRevalidation);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') handleRevalidation();
-    });
-    window.addEventListener('focus', handleRevalidation);
-
-    return () => {
-      window.removeEventListener('online', handleRevalidation);
-      document.removeEventListener('visibilitychange', handleRevalidation);
-      window.removeEventListener('focus', handleRevalidation);
-    };
-  }, []);
-
-  // Fetch Verse ONLY ONCE on mount
-  useEffect(() => {
-    fetchVerse();
-  }, []);
-
-  // Sync Stats when returning to Home or checking profile
-  useEffect(() => {
-    const sync = async () => {
-      if (activeTab === 'home' || activeTab === 'profile') {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.email) loadStats(session.user.email);
-      }
-    };
-    sync();
-  }, [activeTab]);
+  };
 
   const loadStats = async (email: string) => {
     if (typeof window === 'undefined') return;
@@ -175,16 +119,13 @@ export default function Home() {
       }
     });
 
-
     const allHabits = [...positive, ...negative];
-
 
     setStats({
       positiveTotal: positive.length,
       positiveCompleted: posCompleted,
       badTotal: negative.length,
       badClean: negative.filter((h: any) => h.completed).length,
-
       projectsTotal: activeProjects.length,
       projectsBehind: behindCount,
     });
@@ -231,6 +172,72 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = '/login';
+        return;
+      }
+
+      const userProfile = await getUserProfile(session.user.email!);
+      if (!userProfile || !userProfile.name) {
+        window.location.href = '/onboarding';
+      } else {
+        setUser(userProfile);
+      }
+
+      loadStats(session.user.email!);
+    };
+    checkSession();
+
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && tabs.includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+
+    const handleRevalidation = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) loadStats(session.user.email);
+
+      const today = new Date().toLocaleDateString('en-CA');
+      const cachedDate = localStorage.getItem('verseDate_local');
+      if (cachedDate !== today) {
+        fetchVerse(true);
+      }
+    };
+
+    window.addEventListener('online', handleRevalidation);
+    return () => {
+      window.removeEventListener('online', handleRevalidation);
+    };
+  }, []);
+
+  useEffect(() => {
+    fetchVerse();
+  }, []);
+
+  useEffect(() => {
+    const sync = async () => {
+      if (activeTab === 'home' || activeTab === 'profile') {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email) loadStats(session.user.email);
+      }
+    };
+    sync();
+  }, [activeTab]);
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'verse': return <VerseSection verse={verse} loading={loading} onRefresh={() => fetchVerse(true)} />;
+      case 'habits': return <HabitsSection />;
+      case 'projects': return <ProjectsSection />;
+      case 'profile': return <ProfileSection initialUser={user} />;
+      default: return renderDashboard();
+    }
+  };
+
   const todayStr = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -244,18 +251,7 @@ export default function Home() {
     return "Good Evening";
   };
 
-
-  const TabContent = () => {
-    switch (activeTab) {
-      case 'verse': return <VerseSection verse={verse} loading={loading} onRefresh={() => fetchVerse(true)} />;
-      case 'habits': return <HabitsSection />;
-      case 'projects': return <ProjectsSection />;
-      case 'profile': return <ProfileSection />;
-      default: return <Dashboard />;
-    }
-  };
-
-  const Dashboard = () => (
+  const renderDashboard = () => (
     <div className="min-h-screen bg-transparent text-white pb-24 px-4 pt-6">
       <header className="flex justify-between items-start mb-8">
         <div>
@@ -264,9 +260,18 @@ export default function Home() {
             {getGreeting()}
           </h1>
         </div>
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7dd3fc] to-[#86efac] p-[1px]">
-          <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
-            <span className="font-bold text-transparent bg-clip-text bg-gradient-to-br from-[#7dd3fc] to-[#86efac]">M</span>
+        <div
+          onClick={() => handleTabChange('profile')}
+          className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7dd3fc] to-[#86efac] p-[1px] cursor-pointer hover:scale-105 transition-transform"
+        >
+          <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-bold text-transparent bg-clip-text bg-gradient-to-br from-[#7dd3fc] to-[#86efac]">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'M'}
+              </span>
+            )}
           </div>
         </div>
       </header>
@@ -423,7 +428,7 @@ export default function Home() {
           onDragEnd={handleDragEnd}
           className="w-full h-full absolute top-0 left-0"
         >
-          <TabContent />
+          {renderTabContent()}
         </motion.div>
       </AnimatePresence>
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
