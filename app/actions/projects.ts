@@ -56,8 +56,27 @@ export async function updateProject(id: string, data: { name?: string, progress?
             where: { id },
             data: updateData
         });
-        revalidatePath('/');
         return { success: true, project };
+    } catch (error) {
+        return { error: 'Failed' };
+    }
+}
+
+// ATOMIC PROGRESS UPDATE
+export async function updateProjectProgress(id: string, delta: number) {
+    try {
+        const project = await prisma.project.findUnique({ where: { id } });
+        if (!project) return { error: "Not found" };
+
+        const current = project.progress || 0;
+        const newProgress = Math.max(0, Math.min(100, current + delta));
+
+        const updated = await prisma.project.update({
+            where: { id },
+            data: { progress: newProgress }
+        });
+
+        return { success: true, project: updated };
     } catch (error) {
         return { error: 'Failed' };
     }

@@ -61,7 +61,8 @@ export async function createHabit(email: string, name: string, type: 'positive' 
 }
 
 // TOGGLE (Complete/Uncomplete)
-export async function toggleHabit(id: string) {
+// TOGGLE (Idempotent Set)
+export async function setHabitCompletion(id: string, completed: boolean) {
     const today = getToday();
 
     try {
@@ -69,16 +70,23 @@ export async function toggleHabit(id: string) {
             const habit = await tx.habit.findUnique({ where: { id } });
             if (!habit) throw new Error("Not found");
 
-            const isCompletedToday = habit.completedDates.includes(today);
-            let newHistory = isCompletedToday
-                ? habit.completedDates.filter((d: string) => d !== today)
-                : [...habit.completedDates, today];
+            const isCurrentlyCompleted = habit.completedDates.includes(today);
 
-            // Streak Calculation
+            // Idempotency Check: If already in desired state, return success
+            if (isCurrentlyCompleted === completed) {
+                return habit;
+            }
+
+            let newHistory = habit.completedDates;
             let streak = habit.streak;
-            if (!isCompletedToday) {
+
+            if (completed) {
+                // Add today
+                newHistory = [...habit.completedDates, today];
                 streak = habit.streak + 1;
             } else {
+                // Remove today
+                newHistory = habit.completedDates.filter((d: string) => d !== today);
                 streak = Math.max(0, habit.streak - 1);
             }
 
@@ -99,7 +107,7 @@ export async function toggleHabit(id: string) {
             habit: { ...result, completed: result.completedDates.includes(today) }
         };
     } catch (error) {
-        console.error('toggleHabit error:', error);
+        console.error('setHabitCompletion error:', error);
         return { error: 'Failed' };
     }
 }

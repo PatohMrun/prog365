@@ -411,7 +411,8 @@ export default function Home() {
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.2}
           onDragEnd={handleDragEnd}
-          className="w-full h-full absolute top-0 left-0"
+
+          className="w-full h-full absolute top-0 left-0 overflow-y-auto overflow-x-hidden no-scrollbar"
         >
           {renderTabContent()}
         </motion.div>

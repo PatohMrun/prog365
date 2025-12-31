@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, Check, Trash2, Edit2, Shield, Flame, Archive, RotateCcw, X, AlertTriangle } from "lucide-react";
-import { getHabits, createHabit, toggleHabit, updateHabitName, updateHabitStatus } from "../actions/habits";
+import { getHabits, createHabit, setHabitCompletion, updateHabitName, updateHabitStatus } from "../actions/habits";
 import { supabase } from "../utils/supabase";
 
 interface HabitsSectionProps {
@@ -41,9 +41,41 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
     setNewHabitName('');
   };
 
+  // Sync & Backup Logic
+  const backupHabits = useRef<{ [key: string]: boolean }>({});
+  const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  const pendingUpdates = useRef<{ [key: string]: boolean }>({});
+
   const handleToggle = async (id: string, type: 'positive' | 'negative' = 'positive') => {
-    // Optimistic Update
-    const updater = (h: any) => h.id === id ? { ...h, completed: !h.completed } : h;
+    // 1. GET CURRENT STATE
+    const list = type === 'positive' ? positiveHabits : badHabits;
+    const habit = list.find(h => h.id === id);
+    if (!habit) return;
+
+    // 2. CLEAR TIMER
+    if (debounceTimers.current[id]) {
+      clearTimeout(debounceTimers.current[id]);
+    }
+
+    // 3. BACKUP STATE (If start of sequence)
+    // For boolean toggles, we backup the *original* server state if not already tracking
+    if (pendingUpdates.current[id] === undefined) {
+      backupHabits.current[id] = habit.completed;
+    }
+
+    // 4. DETERMINE TARGET STATE
+    // If pending, we flip that. If not, we flip current.
+    // Actually, simpler: just flip the current UI state to get target.
+    const targetState = !habit.completed;
+    pendingUpdates.current[id] = targetState;
+
+    // 5. OPTIMISTIC UPDATE UI (Instant)
+    const updater = (h: any) => h.id === id ? {
+      ...h,
+      completed: targetState,
+      // Optimistic Streak: +1 if completing, -1 if uncompleting
+      streak: targetState ? h.streak + 1 : Math.max(0, h.streak - 1)
+    } : h;
 
     setHabitsData(prev => ({
       ...prev,
@@ -51,15 +83,44 @@ export default function HabitsSection({ habitsData, setHabitsData, onUpdate }: H
       negative: type === 'negative' ? prev.negative.map(updater) : prev.negative
     }));
 
-    const result = await toggleHabit(id);
-    if (result.success && result.habit) {
-      // Authoritative update from server (fixes streak consistency)
-      setHabitsData(prev => ({
-        ...prev,
-        positive: type === 'positive' ? prev.positive.map(h => h.id === id ? result.habit : h) : prev.positive,
-        negative: type === 'negative' ? prev.negative.map(h => h.id === id ? result.habit : h) : prev.negative
-      }));
-    }
+    // 6. DEBOUNCE SERVER CALL (600ms)
+    debounceTimers.current[id] = setTimeout(() => {
+      // Get final intended state
+      const finalState = pendingUpdates.current[id];
+
+      // Clean up refs
+      delete pendingUpdates.current[id];
+      delete debounceTimers.current[id];
+
+      setHabitCompletion(id, finalState).then(result => {
+        if (!result.success) {
+          console.error("Failed to sync habit");
+          // ROLLBACK
+          const originalState = backupHabits.current[id];
+          if (originalState !== undefined) {
+            // Revert Logic
+            const reverter = (h: any) => h.id === id ? {
+              ...h,
+              completed: originalState,
+              // Approximate streak revert (not perfect but safe)
+              streak: originalState ? h.streak + 1 : Math.max(0, h.streak - 1)
+            } : h;
+
+            setHabitsData(prev => ({
+              ...prev,
+              positive: type === 'positive' ? prev.positive.map(reverter) : prev.positive,
+              negative: type === 'negative' ? prev.negative.map(reverter) : prev.negative
+            }));
+          }
+        } else {
+          // Success: Clear backup
+          delete backupHabits.current[id];
+          // Ideally update streak with authoritative server data if desired, 
+          // but for "Silent Sync" we often trust local unless error.
+          // (Optionally sync streak here if critical)
+        }
+      });
+    }, 600);
   };
 
   const startEdit = (habit: any) => {

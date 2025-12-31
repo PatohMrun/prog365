@@ -30,7 +30,7 @@ export async function createReflection(email: string, text: string, verseReferen
     try {
         const date = new Date().toLocaleDateString('en-CA');
 
-        await prisma.reflection.create({
+        const reflection = await prisma.reflection.create({
             data: {
                 content: text,
                 verseReference,
@@ -39,7 +39,7 @@ export async function createReflection(email: string, text: string, verseReferen
             }
         });
         revalidatePath('/');
-        return { success: true };
+        return { success: true, reflection };
     } catch (error) {
         console.error('createReflection error:', error);
         return { error: 'Failed' };

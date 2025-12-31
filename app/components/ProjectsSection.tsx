@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BarChart3, Plus, Trash2, Calendar, TrendingUp, AlertCircle, CheckCircle2, Pencil, Archive, Check } from "lucide-react";
-import { getProjects, createProject, updateProject, updateProjectStatus } from "../actions/projects";
+import { getProjects, createProject, updateProject, updateProjectStatus, updateProjectProgress } from "../actions/projects";
 import { supabase } from "../utils/supabase";
 
 interface ProjectsSectionProps {
@@ -90,24 +90,88 @@ export default function ProjectsSection({ projects, setProjects, onUpdate }: Pro
         setEditingId(null);
     };
 
-    const updateProgress = async (id: string, delta: number) => {
-        const project = projects.find(p => p.id === id);
-        if (!project) return;
+    // Sync & Backup Logic
+    const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+    const backupValues = useRef<{ [key: string]: number }>({});
 
-        const newProgress = Math.max(0, Math.min(100, project.progress + delta));
+    // Debounce Logic Refs
+    const pendingDeltas = useRef<{ [key: string]: number }>({});
+    const debounceTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
 
-        // Optimistic UI (Fast)
-        setProjects(prev => prev.map(p => p.id === id ? { ...p, progress: newProgress } : p));
-
-        const result = await updateProject(id, { progress: newProgress });
-
-        // Authoritative confirmation
-        if (result.success && result.project) {
-            setProjects(prev => prev.map(p => p.id === id ? result.project : p));
+    const updateProgress = (id: string, delta: number) => {
+        // 1. CLEAR EXISTING TIMER
+        if (debounceTimers.current[id]) {
+            clearTimeout(debounceTimers.current[id]);
         }
+
+        // 2. ACCUMULATE LOCAL DELTA
+        const currentPending = pendingDeltas.current[id] || 0;
+        pendingDeltas.current[id] = currentPending + delta;
+
+        // 2. BACKUP & SYNC START
+        if (!pendingDeltas.current[id]) {
+            const project = projects.find(p => p.id === id);
+            if (project) backupValues.current[id] = project.progress;
+        }
+        setSavingIds(prev => new Set(prev).add(id));
+
+        // 3. OPTIMISTIC UPDATE (Instant Feedback)
+        setProjects(prev => {
+            return prev.map(p => {
+                if (p.id !== id) return p;
+                const current = Number(p.progress) || 0;
+                // Note: We apply 'delta' to the CURRENT state, not the accumulated one,
+                // because 'delta' is the user's latest click intent (+5).
+                const next = Math.max(0, Math.min(100, current + delta));
+                return { ...p, progress: next };
+            });
+        });
+
+        // 4. SET NEW DEBOUNCE TIMER (600ms)
+        debounceTimers.current[id] = setTimeout(() => {
+            const finalDelta = pendingDeltas.current[id];
+
+            // Clear pending tracking *before* calling (so new clicks start fresh)
+            delete pendingDeltas.current[id];
+            delete debounceTimers.current[id];
+
+            if (finalDelta !== 0) {
+                updateProjectProgress(id, finalDelta).then(result => {
+                    setSavingIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(id);
+                        return next;
+                    });
+
+                    if (!result.success) {
+                        console.error("Failed to update progress, rolling back.");
+                        const originalValue = backupValues.current[id];
+                        if (originalValue !== undefined) {
+                            setProjects(prev => prev.map(p => p.id === id ? { ...p, progress: originalValue } : p));
+                        }
+                    } else {
+                        delete backupValues.current[id];
+                    }
+                });
+            } else {
+                setSavingIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(id);
+                    return next;
+                });
+            }
+        }, 600);
     };
 
     const completeProject = async (project: any) => {
+        // 1. CANCEL PENDING DEBOUNCES (Race Condition Protection)
+        if (debounceTimers.current[project.id]) {
+            clearTimeout(debounceTimers.current[project.id]);
+            delete debounceTimers.current[project.id];
+            delete pendingDeltas.current[project.id];
+        }
+
+        // 2. Proceed with Completion
         const result = await updateProjectStatus(project.id, 'completed');
         if (result.success && result.project) {
             setProjects(prev => prev.map(p => p.id === project.id ? result.project : p));

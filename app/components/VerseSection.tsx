@@ -39,10 +39,36 @@ export default function VerseSection({ verse, loading, onRefresh }: VerseSection
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.email) return;
 
-    await createReflection(session.user.email, reflectionText.trim(), verse?.reference || '');
+    const content = reflectionText.trim();
+    const tempId = `temp-${Date.now()}`;
+    const today = new Date().toLocaleDateString('en-CA');
 
+    // 1. CLEAR INPUT IMMEDIATELY
     setReflectionText("");
-    loadReflections();
+
+    // 2. OPTIMISTIC UPDATE
+    const tempReflection = {
+      id: tempId,
+      content,
+      verseReference: verse?.reference || '',
+      date: today
+    };
+
+    setReflections(prev => [tempReflection, ...prev]);
+
+    // 3. SILENT SYNC
+    createReflection(session.user.email, content, verse?.reference || '').then(result => {
+      if (result.success && result.reflection) {
+        // SWAP TEMP ID WITH REAL ID
+        setReflections(prev => prev.map(r => r.id === tempId ? result.reflection : r));
+      } else {
+        console.error("Failed to save reflection");
+        // ROLLBACK (Remove temp item)
+        setReflections(prev => prev.filter(r => r.id !== tempId));
+        // Restore text (optional, but good UX)
+        setReflectionText(content);
+      }
+    });
   };
 
   return (
